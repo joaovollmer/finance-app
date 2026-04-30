@@ -8,22 +8,30 @@ import { formatCurrency } from "@/lib/portfolio/valuation";
 
 interface Props {
   portfolioId: string;
+  portfolioCurrency: string;
   ticker: string;
   assetClass: AssetClass;
   price: number;
   currency: string;
   cashBalance: number;
   ownedQuantity: number;
+  /** Taxa de câmbio para converter `currency` -> `portfolioCurrency`.
+   *  Obrigatória quando as moedas diferem. */
+  fxRate?: number;
+  fxDate?: string;
 }
 
 export default function OrderForm({
   portfolioId,
+  portfolioCurrency,
   ticker,
   assetClass,
   price,
   currency,
   cashBalance,
   ownedQuantity,
+  fxRate,
+  fxDate,
 }: Props) {
   const router = useRouter();
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -33,7 +41,11 @@ export default function OrderForm({
   const [loading, setLoading] = useState(false);
 
   const qty = typeof quantity === "number" ? quantity : 0;
-  const total = qty * price;
+  const totalNative = qty * price;
+
+  const needsFx = currency !== portfolioCurrency;
+  const effectiveFx = needsFx ? fxRate ?? 0 : 1;
+  const cashAmount = totalNative * effectiveFx;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +56,11 @@ export default function OrderForm({
       setError("Quantidade deve ser positiva.");
       return;
     }
-    if (side === "buy" && total > cashBalance) {
+    if (needsFx && (!fxRate || fxRate <= 0)) {
+      setError("Câmbio indisponível para esta operação.");
+      return;
+    }
+    if (side === "buy" && cashAmount > cashBalance) {
       setError("Saldo insuficiente para essa compra.");
       return;
     }
@@ -62,6 +78,7 @@ export default function OrderForm({
       p_side: side,
       p_quantity: qty,
       p_price: price,
+      p_cash_amount: Number(cashAmount.toFixed(2)),
     });
     setLoading(false);
 
@@ -129,12 +146,35 @@ export default function OrderForm({
         <div className="mt-1 flex justify-between">
           <span className="text-slate-600">Total estimado</span>
           <span className="font-semibold">
-            {formatCurrency(total, currency)}
+            {formatCurrency(totalNative, currency)}
           </span>
         </div>
+        {needsFx && (
+          <>
+            <div className="mt-1 flex justify-between text-xs text-slate-500">
+              <span>
+                Câmbio {currency}/{portfolioCurrency}
+                {fxDate ? ` · ${fxDate}` : ""}
+              </span>
+              <span>
+                {fxRate
+                  ? fxRate.toLocaleString("pt-BR", { maximumFractionDigits: 4 })
+                  : "—"}
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-slate-600">
+                Total em {portfolioCurrency}
+              </span>
+              <span className="font-semibold">
+                {formatCurrency(cashAmount, portfolioCurrency)}
+              </span>
+            </div>
+          </>
+        )}
         <div className="mt-1 flex justify-between text-xs text-slate-500">
           <span>Saldo em caixa</span>
-          <span>{formatCurrency(cashBalance)}</span>
+          <span>{formatCurrency(cashBalance, portfolioCurrency)}</span>
         </div>
         {ownedQuantity > 0 && (
           <div className="flex justify-between text-xs text-slate-500">
@@ -166,6 +206,9 @@ export default function OrderForm({
       <p className="text-xs text-slate-500">
         A ordem é executada na cotação atual exibida. Cotações fora do horário
         de pregão usam o último preço disponível.
+        {needsFx
+          ? " Para ativos em moeda estrangeira, usamos o PTAX do BCB para converter ao saldo em caixa."
+          : ""}
       </p>
     </form>
   );

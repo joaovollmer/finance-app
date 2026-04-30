@@ -79,17 +79,18 @@ app/
     carteira/                  # dashboard com cards, gráfico de evolução, tabela
     mercado/                   # busca de ativos
     ativo/[ticker]/            # detalhe + gráfico + OrderForm
-  api/{quote,history,search}/  # endpoints sobre o wrapper do Yahoo
+  api/{quote,history,search,fx}/ # endpoints sobre os providers (Yahoo, BCB)
 lib/
   supabase/{client,server,middleware}.ts
-  market/{yahoo,types}.ts
+  market/{yahoo,bcb,types}.ts
   portfolio/valuation.ts
 components/
   auth/LogoutButton.tsx
   charts/PortfolioChart.tsx
   market/{AssetSearch,PriceChart,OrderForm}.tsx
-supabase/migrations/0001_init.sql   # schema + RLS + RPC execute_order
-middleware.ts                       # protege /(app)/* e atualiza sessão
+supabase/migrations/0001_init.sql           # schema + RLS + RPC execute_order
+supabase/migrations/0002_fx_cash_amount.sql # cash_amount + execute_order com câmbio
+middleware.ts                               # protege /(app)/* e atualiza sessão
 ```
 
 ## Estado Atual
@@ -104,12 +105,26 @@ middleware.ts                       # protege /(app)/* e atualiza sessão
     atomicamente via RPC `execute_order`.
   - Dashboard `/carteira` mostra patrimônio total, P&L, posições e
     evolução com snapshot diário.
-- Falta: rodar `npm install` e `npm run build` em ambiente real, aplicar a
-  migration em projeto Supabase, ajustar `.env.local` com chaves reais.
+- **Fase 2 (em andamento):**
+  - Conversão cambial USD→BRL via PTAX do BCB SGS (série 1).
+    - Provider: `lib/market/bcb.ts` (`getUsdToBrl`, cache 30min).
+    - Endpoint: `app/api/fx/route.ts`.
+    - `OrderForm` recebe `fxRate`/`fxDate` quando a moeda do ativo difere da
+      carteira. RPC `execute_order` agora aceita `p_cash_amount` (BRL) separado
+      de `p_price` (moeda nativa do ativo). Migration
+      `0002_fx_cash_amount.sql` adiciona coluna `cash_amount` em
+      `transactions` e recria a função.
+    - `/carteira` converte posições USD pelo PTAX para o patrimônio total e
+      exibe um aviso quando o câmbio não está disponível.
+  - Build fix: `serverComponentsExternalPackages: ["yahoo-finance2"]` em
+    `next.config.mjs` (a build ESM do pacote contém arquivos de teste com
+    `@std/testing/mock`, que o webpack não resolve).
+- Falta: rodar `npm install` e `npm run build` em ambiente real, aplicar as
+  migrations em projeto Supabase, ajustar `.env.local` com chaves reais.
 
 ## Decisões Adiadas (Fase 2+)
 
-- [ ] Conversão cambial (BCB SGS) para ativos USD na carteira BRL.
+- [x] Conversão cambial (BCB SGS) para ativos USD na carteira BRL.
 - [ ] Snapshot diário via cron em vez de upsert no acesso.
 - [ ] Cripto (CoinGecko) e renda fixa básica.
 - [ ] Hospedagem (Vercel + Supabase é o caminho natural).

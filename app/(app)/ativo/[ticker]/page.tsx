@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getHistory, getQuote } from "@/lib/market/yahoo";
+import { getUsdToBrl } from "@/lib/market/bcb";
 import { formatCurrency, formatPercent } from "@/lib/portfolio/valuation";
 import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
@@ -51,6 +52,12 @@ export default async function AtivoPage({
 
   const ownedQty = holding ? Number(holding.quantity) : 0;
   const positive = quote.change >= 0;
+
+  const needsFx =
+    quote.currency !== portfolio.currency &&
+    quote.currency === "USD" &&
+    portfolio.currency === "BRL";
+  const fx = needsFx ? await getUsdToBrl().catch(() => null) : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -102,22 +109,32 @@ export default async function AtivoPage({
 
       <aside className="rounded-2xl border border-surface-border bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-900">Operar</h2>
-        {quote.currency !== portfolio.currency && (
+        {needsFx && !fx && (
+          <p className="mt-2 rounded bg-red-50 p-2 text-xs text-red-700">
+            Não foi possível carregar o câmbio do BCB. Tente novamente em
+            instantes.
+          </p>
+        )}
+        {needsFx && fx && (
           <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-800">
-            Atenção: este ativo é cotado em {quote.currency}, enquanto sua
-            carteira está em {portfolio.currency}. No MVP, a operação é
-            registrada em {quote.currency} sem conversão cambial.
+            Ativo em {quote.currency}; sua carteira está em {portfolio.currency}.
+            Usaremos o PTAX do BCB ({fx.date}) — 1 USD ={" "}
+            {fx.rate.toLocaleString("pt-BR", { maximumFractionDigits: 4 })} BRL —
+            para converter ao saldo em caixa.
           </p>
         )}
         <div className="mt-4">
           <OrderForm
             portfolioId={portfolio.id}
+            portfolioCurrency={portfolio.currency}
             ticker={quote.ticker}
             assetClass={quote.assetClass}
             price={quote.price}
             currency={quote.currency}
             cashBalance={Number(portfolio.cash_balance)}
             ownedQuantity={ownedQty}
+            fxRate={fx?.rate}
+            fxDate={fx?.date}
           />
         </div>
       </aside>
