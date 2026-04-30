@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getHistory, getQuote } from "@/lib/market/yahoo";
+import { getAssetSummary, getHistory, getQuote } from "@/lib/market/yahoo";
 import { getUsdToBrl } from "@/lib/market/bcb";
 import { formatCurrency, formatPercent } from "@/lib/portfolio/valuation";
 import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
+import AssetSummaryPanel from "@/components/market/AssetSummaryPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,12 @@ export default async function AtivoPage({
 
   let quote;
   let candles;
+  let summary = null;
   try {
-    [quote, candles] = await Promise.all([
+    [quote, candles, summary] = await Promise.all([
       getQuote(decoded),
       getHistory(decoded, "1y"),
+      getAssetSummary(decoded).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -105,6 +108,21 @@ export default async function AtivoPage({
             />
           </div>
         </div>
+
+        {summary && (
+          <div className="rounded-2xl border border-surface-border bg-white p-5">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Resumo da empresa
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Indicadores fundamentalistas da{" "}
+              {summary.longName ?? quote.name} via Yahoo Finance.
+            </p>
+            <div className="mt-4">
+              <AssetSummaryPanel summary={summary} />
+            </div>
+          </div>
+        )}
       </section>
 
       <aside className="rounded-2xl border border-surface-border bg-white p-5">

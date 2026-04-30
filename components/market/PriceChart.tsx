@@ -45,8 +45,12 @@ export default function PriceChart({
         const res = await fetch(
           `/api/history?ticker=${encodeURIComponent(ticker)}&range=${range}`
         );
-        const data = await res.json();
-        if (!cancelled) setCandles(data.candles ?? []);
+        if (!res.ok) {
+          if (!cancelled) setCandles([]);
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        if (!cancelled) setCandles(data?.candles ?? []);
       } finally {
         if (!cancelled) setLoading(false);
       }

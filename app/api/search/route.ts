@@ -13,11 +13,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ results: [] });
   }
 
-  const results = await searchAssets(parsed.data.q);
-  return NextResponse.json(
-    { results },
-    {
-      headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=120" },
-    }
-  );
+  try {
+    const results = await searchAssets(parsed.data.q);
+    return NextResponse.json(
+      { results },
+      {
+        headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=120" },
+      }
+    );
+  } catch (e) {
+    console.error("[/api/search] falha:", e);
+    return NextResponse.json(
+      { results: [], error: "busca indisponível" },
+      { status: 502 }
+    );
+  }
 }

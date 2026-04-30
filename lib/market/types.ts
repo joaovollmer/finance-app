@@ -28,3 +28,33 @@ export interface AssetSearchResult {
   assetClass: AssetClass;
   exchange?: string;
 }
+
+export interface AssetSummary {
+  ticker: string;
+  displayTicker: string;
+  name: string;
+  longName?: string;
+  currency: string;
+  exchange?: string;
+  sector?: string;
+  industry?: string;
+  country?: string;
+  website?: string;
+  longBusinessSummary?: string;
+  marketCap?: number;
+  trailingPE?: number;
+  forwardPE?: number;
+  priceToBook?: number;
+  trailingEps?: number;
+  dividendYield?: number;
+  beta?: number;
+  fiftyTwoWeekLow?: number;
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekChangePercent?: number;
+  ytdReturn?: number;
+  averageVolume?: number;
+  profitMargins?: number;
+  returnOnEquity?: number;
+  totalRevenue?: number;
+}
+

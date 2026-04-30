@@ -78,7 +78,7 @@ app/
     onboarding/                # define saldo inicial e cria portfolio
     carteira/                  # dashboard com cards, gráfico de evolução, tabela
     mercado/                   # busca de ativos
-    ativo/[ticker]/            # detalhe + gráfico + OrderForm
+    ativo/[ticker]/            # detalhe + gráfico + resumo + OrderForm
   api/{quote,history,search,fx}/ # endpoints sobre os providers (Yahoo, BCB)
 lib/
   supabase/{client,server,middleware}.ts
@@ -87,7 +87,7 @@ lib/
 components/
   auth/LogoutButton.tsx
   charts/PortfolioChart.tsx
-  market/{AssetSearch,PriceChart,OrderForm}.tsx
+  market/{AssetSearch,PriceChart,OrderForm,AssetSummaryPanel}.tsx
 supabase/migrations/0001_init.sql           # schema + RLS + RPC execute_order
 supabase/migrations/0002_fx_cash_amount.sql # cash_amount + execute_order com câmbio
 middleware.ts                               # protege /(app)/* e atualiza sessão
@@ -118,9 +118,19 @@ middleware.ts                               # protege /(app)/* e atualiza sessã
       exibe um aviso quando o câmbio não está disponível.
   - Build fix: `serverComponentsExternalPackages: ["yahoo-finance2"]` em
     `next.config.mjs` (a build ESM do pacote contém arquivos de teste com
-    `@std/testing/mock`, que o webpack não resolve). Usar
-    `yahoo-finance2` na última versão 2.x (`npm install yahoo-finance2@latest`)
-    para garantir que o módulo de testes não seja arrastado para o bundle.
+    `@std/testing/mock`, que o webpack não resolve).
+  - **yahoo-finance2 v3**: a default export é a classe `YahooFinance`, então
+    `lib/market/yahoo.ts` instancia
+    `const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });`
+    antes de chamar os métodos. `package.json` fixa `^3.0.0`.
+  - Busca de ativos (`searchAssets`) deixou de filtrar por exchange — qualquer
+    EQUITY/ETF que o Yahoo devolver é aceito; tickers `.SA` viram `stock_br`,
+    o resto vai como `stock_us` (com `currency` real vindo da `quote`).
+  - Página `/ativo/[ticker]` usa `getAssetSummary` (`yahooFinance.quoteSummary`,
+    módulos `price`/`summaryDetail`/`defaultKeyStatistics`/`summaryProfile`/
+    `financialData`) para exibir market cap, P/L, P/VP, LPA, dividend yield,
+    beta, faixa de 52 semanas, variação 12m, margem líquida, ROE, setor,
+    indústria, site e descrição da empresa via `AssetSummaryPanel`.
   - Tipagem do `yahooFinance.quote()`: a versão mais recente devolve uma
     união discriminada por `quoteType` que o TS resolve para `never` quando o
     símbolo é genérico. `lib/market/yahoo.ts` declara um shape mínimo

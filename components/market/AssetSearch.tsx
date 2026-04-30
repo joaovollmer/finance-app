@@ -20,8 +20,12 @@ export default function AssetSearch() {
         const res = await fetch(
           `/api/search?q=${encodeURIComponent(query.trim())}`
         );
-        const data = await res.json();
-        setResults(data.results ?? []);
+        if (!res.ok) {
+          setResults([]);
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        setResults(data?.results ?? []);
       } finally {
         setLoading(false);
       }
