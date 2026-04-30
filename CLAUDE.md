@@ -1,0 +1,116 @@
+# CLAUDE.md — Memória do Projeto
+
+Este arquivo serve como memória persistente para o agente Claude trabalhando neste repositório. Sempre leia este arquivo no início de uma sessão antes de modificar código.
+
+## Visão Geral
+
+**finance-app** é um simulador de carteira de investimentos. O usuário define uma quantia imaginária e realiza investimentos com dados de mercado em tempo real, sem risco financeiro real. O foco é educacional, atendendo desde leigos até usuários avançados (incluindo professores).
+
+## Audiência
+
+- Iniciantes que querem aprender a investir sem arriscar dinheiro real.
+- Investidores experientes querendo testar estratégias.
+- Professores e especialistas que precisam de uma ferramenta didática.
+
+A interface e os textos devem ser acessíveis ao leigo, mas os dados devem ter profundidade suficiente para o avançado.
+
+## Funcionalidades-Alvo
+
+- Definição flexível do montante inicial imaginário.
+- Compra/venda simulada em múltiplas classes de ativos:
+  - Ações (B3 + bolsas internacionais)
+  - ETFs / fundos listados
+  - Fundos de investimento e previdência
+  - Criptomoedas
+  - Renda fixa (CDB, LCI, LCA, debêntures)
+  - Títulos públicos (Tesouro Direto, Treasuries, bonds)
+- Visualização gráfica da rentabilidade histórica da carteira (1 mês até 5 anos).
+- Comparação com benchmarks (CDI, Ibovespa, S&P 500, IPCA).
+- Detalhamento por ativo: posição, P&L realizado/não realizado, dividendos.
+
+## Fontes de Dados
+
+| Fonte | Uso | Frequência |
+|-------|-----|-----------|
+| Yahoo Finance | Cotações de ações, ETFs, cripto, índices | Tempo real / intraday |
+| FRED (Federal Reserve) | Indicadores macro (juros, inflação) | Diária |
+| CVM | Cotas de fundos brasileiros | Diária |
+| ANBIMA | Renda fixa, debêntures, IMA | Diária |
+| Banco Central (BCB SGS) | CDI, Selic, IPCA, câmbio | Diária |
+| CoinGecko (alternativa) | Criptomoedas | Tempo real |
+
+Priorizar APIs gratuitas. Centralizar acesso em uma camada de "data providers" para facilitar troca de fonte.
+
+## Convenções de Desenvolvimento
+
+- **Branch de trabalho:** `claude/investment-portfolio-simulator-9ck36`. Todo desenvolvimento ocorre nesta branch.
+- **Commits:** mensagens descritivas em português, focadas no "porquê". Commits pequenos e frequentes.
+- **README.md:** mantém um resumo executivo do estado atual do app. Atualizar a cada marco relevante.
+- **Documentação técnica:** comentários no código apenas quando o "porquê" não for óbvio. Nunca explicar o "o quê".
+- **Idioma:** UI e documentação em português (pt-BR). Identificadores de código em inglês.
+
+## Roadmap (alto nível)
+
+1. **Fase 0 — Fundação** *(em andamento)*: definição de stack, scaffolding, estrutura de pastas.
+2. **Fase 1 — MVP de ações:** buscar cotações, simular compra/venda de ações, persistir carteira local, gráfico de evolução.
+3. **Fase 2 — Múltiplas classes:** ETFs, cripto, renda fixa básica.
+4. **Fase 3 — Fundos e previdência:** integração CVM/ANBIMA.
+5. **Fase 4 — Análise avançada:** benchmarks, métricas (Sharpe, volatilidade, drawdown), exportação.
+6. **Fase 5 — Conteúdo educacional:** tooltips explicativos, glossário, modo "guiado".
+
+## Stack Técnica (decidida)
+
+- **Frontend / Backend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- **Banco e auth:** Supabase (Postgres + Auth) — login com e-mail/senha
+- **Cotações:** `yahoo-finance2` (ações B3 com sufixo `.SA`, EUA puro)
+- **Gráficos:** Recharts
+- **Validação:** Zod
+- **Idioma do MVP:** pt-BR
+
+## Estrutura do Código
+
+```
+app/
+  page.tsx                     # landing
+  (auth)/login,cadastro        # auth com Supabase
+  (app)/                       # área autenticada (protegida via middleware)
+    layout.tsx                 # header + nav + logout
+    onboarding/                # define saldo inicial e cria portfolio
+    carteira/                  # dashboard com cards, gráfico de evolução, tabela
+    mercado/                   # busca de ativos
+    ativo/[ticker]/            # detalhe + gráfico + OrderForm
+  api/{quote,history,search}/  # endpoints sobre o wrapper do Yahoo
+lib/
+  supabase/{client,server,middleware}.ts
+  market/{yahoo,types}.ts
+  portfolio/valuation.ts
+components/
+  auth/LogoutButton.tsx
+  charts/PortfolioChart.tsx
+  market/{AssetSearch,PriceChart,OrderForm}.tsx
+supabase/migrations/0001_init.sql   # schema + RLS + RPC execute_order
+middleware.ts                       # protege /(app)/* e atualiza sessão
+```
+
+## Estado Atual
+
+- **Fase 0** concluída: scaffolding Next.js, Tailwind, integração Supabase.
+- **Fase 1 (MVP)** concluída em código:
+  - Cadastro/login com e-mail e senha.
+  - Onboarding define saldo inicial e cria `portfolio`.
+  - Busca de ativos B3/EUA via Yahoo.
+  - Página de detalhe com cotação ao vivo, gráfico 1M–5A e formulário de ordem.
+  - Compras/vendas atualizam `holdings`, `cash_balance` e `transactions`
+    atomicamente via RPC `execute_order`.
+  - Dashboard `/carteira` mostra patrimônio total, P&L, posições e
+    evolução com snapshot diário.
+- Falta: rodar `npm install` e `npm run build` em ambiente real, aplicar a
+  migration em projeto Supabase, ajustar `.env.local` com chaves reais.
+
+## Decisões Adiadas (Fase 2+)
+
+- [ ] Conversão cambial (BCB SGS) para ativos USD na carteira BRL.
+- [ ] Snapshot diário via cron em vez de upsert no acesso.
+- [ ] Cripto (CoinGecko) e renda fixa básica.
+- [ ] Hospedagem (Vercel + Supabase é o caminho natural).
+- [ ] Testes automatizados (Vitest na Fase 2).
