@@ -52,10 +52,13 @@ Integrações planejadas (todas via APIs gratuitas):
 |------|--------|
 | Documentação inicial (README + CLAUDE.md) | ✅ |
 | Stack técnica decidida | ✅ |
-| Scaffolding do projeto | ⏳ |
-| Auth + carteira persistida | ⏳ |
-| MVP de cotação e ordem de ações | ⏳ |
-| Gráfico de evolução | ⏳ |
+| Scaffolding do projeto | ✅ |
+| Auth + carteira persistida (Supabase) | ✅ |
+| MVP de cotação e ordem de ações (B3 + EUA) | ✅ |
+| Gráfico de evolução da carteira (1M–5A) | ✅ |
+| Aplicar migration em ambiente real | ⏳ |
+| Conversão cambial USD→BRL | ⏳ Fase 2 |
+| Cripto + renda fixa | ⏳ Fase 2 |
 
 ## Roadmap
 
@@ -66,15 +69,27 @@ Integrações planejadas (todas via APIs gratuitas):
 5. **Fase 4:** métricas avançadas (Sharpe, volatilidade, drawdown) e benchmarks.
 6. **Fase 5:** conteúdo educacional (tooltips, glossário, modo guiado).
 
-## Setup local (em construção)
+## Setup local
+
+1. Crie um projeto no [Supabase](https://app.supabase.com) e aplique a migration
+   `supabase/migrations/0001_init.sql` (SQL Editor → New Query).
+2. Em **Authentication → Providers**, habilite "Email" com senha.
+3. Copie a URL do projeto e a `anon` key para `.env.local`:
+
+```bash
+cp .env.example .env.local
+# preencher NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+4. Instale e rode:
 
 ```bash
 npm install
-cp .env.example .env.local   # preencher chaves do Supabase
 npm run dev
 ```
 
-Acesse `http://localhost:3000`.
+Acesse `http://localhost:3000`. Crie uma conta, defina o saldo inicial e
+comece a operar.
 
 ## Desenvolvimento
 

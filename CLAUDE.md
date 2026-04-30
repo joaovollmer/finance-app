@@ -58,15 +58,59 @@ Priorizar APIs gratuitas. Centralizar acesso em uma camada de "data providers" p
 5. **Fase 4 — Análise avançada:** benchmarks, métricas (Sharpe, volatilidade, drawdown), exportação.
 6. **Fase 5 — Conteúdo educacional:** tooltips explicativos, glossário, modo "guiado".
 
+## Stack Técnica (decidida)
+
+- **Frontend / Backend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- **Banco e auth:** Supabase (Postgres + Auth) — login com e-mail/senha
+- **Cotações:** `yahoo-finance2` (ações B3 com sufixo `.SA`, EUA puro)
+- **Gráficos:** Recharts
+- **Validação:** Zod
+- **Idioma do MVP:** pt-BR
+
+## Estrutura do Código
+
+```
+app/
+  page.tsx                     # landing
+  (auth)/login,cadastro        # auth com Supabase
+  (app)/                       # área autenticada (protegida via middleware)
+    layout.tsx                 # header + nav + logout
+    onboarding/                # define saldo inicial e cria portfolio
+    carteira/                  # dashboard com cards, gráfico de evolução, tabela
+    mercado/                   # busca de ativos
+    ativo/[ticker]/            # detalhe + gráfico + OrderForm
+  api/{quote,history,search}/  # endpoints sobre o wrapper do Yahoo
+lib/
+  supabase/{client,server,middleware}.ts
+  market/{yahoo,types}.ts
+  portfolio/valuation.ts
+components/
+  auth/LogoutButton.tsx
+  charts/PortfolioChart.tsx
+  market/{AssetSearch,PriceChart,OrderForm}.tsx
+supabase/migrations/0001_init.sql   # schema + RLS + RPC execute_order
+middleware.ts                       # protege /(app)/* e atualiza sessão
+```
+
 ## Estado Atual
 
-- Repositório inicializado.
-- README e CLAUDE.md preenchidos.
-- Stack técnica e scaffolding ainda não definidos — aguardando decisão do usuário.
+- **Fase 0** concluída: scaffolding Next.js, Tailwind, integração Supabase.
+- **Fase 1 (MVP)** concluída em código:
+  - Cadastro/login com e-mail e senha.
+  - Onboarding define saldo inicial e cria `portfolio`.
+  - Busca de ativos B3/EUA via Yahoo.
+  - Página de detalhe com cotação ao vivo, gráfico 1M–5A e formulário de ordem.
+  - Compras/vendas atualizam `holdings`, `cash_balance` e `transactions`
+    atomicamente via RPC `execute_order`.
+  - Dashboard `/carteira` mostra patrimônio total, P&L, posições e
+    evolução com snapshot diário.
+- Falta: rodar `npm install` e `npm run build` em ambiente real, aplicar a
+  migration em projeto Supabase, ajustar `.env.local` com chaves reais.
 
-## Decisões Pendentes
+## Decisões Adiadas (Fase 2+)
 
-- [ ] Stack frontend (Next.js + React + TypeScript é o default proposto).
-- [ ] Estratégia de persistência (localStorage no MVP vs. banco desde o início).
-- [ ] Autenticação (necessária? quando?).
-- [ ] Hospedagem (Vercel, Netlify, etc.).
+- [ ] Conversão cambial (BCB SGS) para ativos USD na carteira BRL.
+- [ ] Snapshot diário via cron em vez de upsert no acesso.
+- [ ] Cripto (CoinGecko) e renda fixa básica.
+- [ ] Hospedagem (Vercel + Supabase é o caminho natural).
+- [ ] Testes automatizados (Vitest na Fase 2).
