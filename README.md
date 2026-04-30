@@ -57,7 +57,7 @@ Integrações planejadas (todas via APIs gratuitas):
 | MVP de cotação e ordem de ações (B3 + EUA) | ✅ |
 | Gráfico de evolução da carteira (1M–5A) | ✅ |
 | Aplicar migration em ambiente real | ⏳ |
-| Conversão cambial USD→BRL | ⏳ Fase 2 |
+| Conversão cambial USD→BRL (PTAX/BCB) | ✅ Fase 2 |
 | Cripto + renda fixa | ⏳ Fase 2 |
 
 ## Roadmap
@@ -71,8 +71,10 @@ Integrações planejadas (todas via APIs gratuitas):
 
 ## Setup local
 
-1. Crie um projeto no [Supabase](https://app.supabase.com) e aplique a migration
-   `supabase/migrations/0001_init.sql` (SQL Editor → New Query).
+1. Crie um projeto no [Supabase](https://app.supabase.com) e aplique as migrations
+   em ordem (SQL Editor → New Query):
+   - `supabase/migrations/0001_init.sql`
+   - `supabase/migrations/0002_fx_cash_amount.sql`
 2. Em **Authentication → Providers**, habilite "Email" com senha.
 3. Copie a URL do projeto e a `anon` key para `.env.local`:
 

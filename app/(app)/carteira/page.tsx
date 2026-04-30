@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getQuote } from "@/lib/market/yahoo";
+import { getUsdToBrl } from "@/lib/market/bcb";
 import {
   formatCurrency,
   formatPercent,
@@ -51,16 +52,32 @@ export default async function CarteiraPage() {
     })
   );
 
+  // Converte posições em moeda estrangeira para a moeda da carteira (BRL).
+  // Sem câmbio disponível, posições USD entram como 0 e exibimos um aviso.
+  const hasUsd = enriched.some(
+    ({ holding, quote }) =>
+      (quote?.currency ?? (holding.asset_class === "stock_us" ? "USD" : "BRL")) !==
+      portfolio.currency
+  );
+  const fx = hasUsd ? await getUsdToBrl().catch(() => null) : null;
+
   const positionsValue = enriched.reduce((acc, { holding, quote }) => {
-    const price = quote?.price ?? holding.avg_price;
-    return acc + holding.quantity * price;
+    const price = quote?.price ?? Number(holding.avg_price);
+    const ccy =
+      quote?.currency ?? (holding.asset_class === "stock_us" ? "USD" : "BRL");
+    const native = holding.quantity * price;
+    if (ccy === portfolio.currency) return acc + native;
+    if (ccy === "USD" && portfolio.currency === "BRL" && fx) {
+      return acc + native * fx.rate;
+    }
+    return acc;
   }, 0);
 
-  const totalValue = portfolio.cash_balance + positionsValue;
-  const totalPnL = totalValue - portfolio.initial_cash;
+  const totalValue = Number(portfolio.cash_balance) + positionsValue;
+  const totalPnL = totalValue - Number(portfolio.initial_cash);
   const totalPnLPct =
     portfolio.initial_cash > 0
-      ? (totalPnL / portfolio.initial_cash) * 100
+      ? (totalPnL / Number(portfolio.initial_cash)) * 100
       : 0;
 
   const { data: snapshots } = await supabase
@@ -98,19 +115,40 @@ export default async function CarteiraPage() {
   return (
     <div className="space-y-8">
       <section className="grid gap-4 sm:grid-cols-3">
-        <Card label="Patrimônio total" value={formatCurrency(totalValue)} />
+        <Card
+          label="Patrimônio total"
+          value={formatCurrency(totalValue, portfolio.currency)}
+        />
         <Card
           label="Saldo em caixa"
-          value={formatCurrency(portfolio.cash_balance)}
-          hint={`de ${formatCurrency(portfolio.initial_cash)} iniciais`}
+          value={formatCurrency(portfolio.cash_balance, portfolio.currency)}
+          hint={`de ${formatCurrency(
+            portfolio.initial_cash,
+            portfolio.currency
+          )} iniciais`}
         />
         <Card
           label="Resultado"
-          value={formatCurrency(totalPnL)}
+          value={formatCurrency(totalPnL, portfolio.currency)}
           hint={formatPercent(totalPnLPct)}
           tone={totalPnL >= 0 ? "positive" : "negative"}
         />
       </section>
+
+      {hasUsd && fx && (
+        <p className="text-xs text-slate-500">
+          Posições em USD convertidas para {portfolio.currency} pelo PTAX do
+          BCB ({fx.date}): 1 USD ={" "}
+          {fx.rate.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}{" "}
+          {portfolio.currency}.
+        </p>
+      )}
+      {hasUsd && !fx && (
+        <p className="rounded bg-red-50 p-2 text-xs text-red-700">
+          Não foi possível obter o câmbio do BCB; posições em USD foram
+          ignoradas no patrimônio total. Tente recarregar.
+        </p>
+      )}
 
       <section className="rounded-2xl border border-surface-border bg-white p-6">
         <h2 className="text-lg font-semibold text-slate-900">
