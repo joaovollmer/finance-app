@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import type {
   AssetClass,
   AssetSearchResult,
@@ -6,6 +6,10 @@ import type {
   HistoryRange,
   Quote,
 } from "./types";
+
+// yahoo-finance2 v3 deixou de exportar uma instância pronta — agora a default
+// export é a classe e precisamos construir a instância manualmente.
+const yahooFinance = new YahooFinance();
 
 // Forma "achatada" do retorno de yahooFinance.quote(symbol).
 // O tipo nativo do yahoo-finance2 é uma união discriminada por quoteType

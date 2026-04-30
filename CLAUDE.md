@@ -118,9 +118,10 @@ middleware.ts                               # protege /(app)/* e atualiza sessã
       exibe um aviso quando o câmbio não está disponível.
   - Build fix: `serverComponentsExternalPackages: ["yahoo-finance2"]` em
     `next.config.mjs` (a build ESM do pacote contém arquivos de teste com
-    `@std/testing/mock`, que o webpack não resolve). Usar
-    `yahoo-finance2` na última versão 2.x (`npm install yahoo-finance2@latest`)
-    para garantir que o módulo de testes não seja arrastado para o bundle.
+    `@std/testing/mock`, que o webpack não resolve).
+  - **yahoo-finance2 v3**: a default export é a classe `YahooFinance`, então
+    `lib/market/yahoo.ts` instancia `const yahooFinance = new YahooFinance();`
+    antes de chamar os métodos. `package.json` fixa `^3.0.0`.
   - Tipagem do `yahooFinance.quote()`: a versão mais recente devolve uma
     união discriminada por `quoteType` que o TS resolve para `never` quando o
     símbolo é genérico. `lib/market/yahoo.ts` declara um shape mínimo
