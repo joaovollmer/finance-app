@@ -7,6 +7,35 @@ import type {
   Quote,
 } from "./types";
 
+// Forma "achatada" do retorno de yahooFinance.quote(symbol).
+// O tipo nativo do yahoo-finance2 é uma união discriminada por quoteType
+// (EQUITY, ETF, CRYPTO, etc.); o TypeScript não consegue inferir o ramo a
+// partir de uma string genérica e resolve para `never`. Como usamos só
+// campos comuns às variantes de equity/ETF, declaramos um shape mínimo e
+// fazemos cast.
+type RawQuote = {
+  regularMarketPrice?: number;
+  regularMarketPreviousClose?: number;
+  longName?: string;
+  shortName?: string;
+  currency?: string;
+  marketState?: string;
+  fullExchangeName?: string;
+};
+
+type RawCandle = {
+  date: Date | string | number;
+  close?: number | null;
+};
+
+type RawSearchQuote = {
+  symbol?: string;
+  exchange?: string;
+  quoteType?: string;
+  longname?: string;
+  shortname?: string;
+};
+
 const B3_SUFFIX = ".SA";
 
 // Usuário digita "PETR4" (B3) ou "AAPL" (EUA). Detectamos a classe pelo formato:
@@ -36,7 +65,7 @@ function normalizeTicker(input: string): {
 
 export async function getQuote(input: string): Promise<Quote> {
   const { yahooSymbol, displayTicker, assetClass } = normalizeTicker(input);
-  const q = await yahooFinance.quote(yahooSymbol);
+  const q = (await yahooFinance.quote(yahooSymbol)) as RawQuote;
 
   const price = q.regularMarketPrice ?? 0;
   const previousClose = q.regularMarketPreviousClose ?? price;
@@ -76,16 +105,18 @@ export async function getHistory(
   const days = RANGE_TO_PERIOD[range];
   const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const result = await yahooFinance.chart(yahooSymbol, {
+  const result = (await yahooFinance.chart(yahooSymbol, {
     period1,
     interval: "1d",
-  });
+  })) as { quotes?: RawCandle[] };
 
   return (result.quotes ?? [])
-    .filter((c) => typeof c.close === "number")
+    .filter((c): c is RawCandle & { close: number } => typeof c.close === "number")
     .map((c) => ({
-      date: (c.date instanceof Date ? c.date : new Date(c.date)).toISOString().slice(0, 10),
-      close: c.close as number,
+      date: (c.date instanceof Date ? c.date : new Date(c.date))
+        .toISOString()
+        .slice(0, 10),
+      close: c.close,
     }));
 }
 
@@ -95,14 +126,15 @@ export async function searchAssets(
   const trimmed = query.trim();
   if (trimmed.length < 1) return [];
 
-  const r = await yahooFinance.search(trimmed, { quotesCount: 10, newsCount: 0 });
+  const r = (await yahooFinance.search(trimmed, {
+    quotesCount: 10,
+    newsCount: 0,
+  })) as { quotes?: RawSearchQuote[] };
   const out: AssetSearchResult[] = [];
 
   for (const item of r.quotes ?? []) {
-    if (!("symbol" in item) || !item.symbol) continue;
-    const symbol = item.symbol;
-    const exchange = "exchange" in item ? item.exchange : undefined;
-    const quoteType = "quoteType" in item ? item.quoteType : undefined;
+    if (!item.symbol) continue;
+    const { symbol, exchange, quoteType } = item;
     if (quoteType !== "EQUITY" && quoteType !== "ETF") continue;
 
     const isB3 = symbol.endsWith(B3_SUFFIX);
@@ -114,10 +146,7 @@ export async function searchAssets(
     out.push({
       ticker: symbol,
       displayTicker: isB3 ? symbol.slice(0, -B3_SUFFIX.length) : symbol,
-      name:
-        ("longname" in item && item.longname) ||
-        ("shortname" in item && item.shortname) ||
-        symbol,
+      name: item.longname ?? item.shortname ?? symbol,
       assetClass: isB3 ? "stock_br" : "stock_us",
       exchange,
     });

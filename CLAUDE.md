@@ -118,9 +118,18 @@ middleware.ts                               # protege /(app)/* e atualiza sessã
       exibe um aviso quando o câmbio não está disponível.
   - Build fix: `serverComponentsExternalPackages: ["yahoo-finance2"]` em
     `next.config.mjs` (a build ESM do pacote contém arquivos de teste com
-    `@std/testing/mock`, que o webpack não resolve).
-- Falta: rodar `npm install` e `npm run build` em ambiente real, aplicar as
-  migrations em projeto Supabase, ajustar `.env.local` com chaves reais.
+    `@std/testing/mock`, que o webpack não resolve). Usar
+    `yahoo-finance2` na última versão 2.x (`npm install yahoo-finance2@latest`)
+    para garantir que o módulo de testes não seja arrastado para o bundle.
+  - Tipagem do `yahooFinance.quote()`: a versão mais recente devolve uma
+    união discriminada por `quoteType` que o TS resolve para `never` quando o
+    símbolo é genérico. `lib/market/yahoo.ts` declara um shape mínimo
+    (`RawQuote`/`RawCandle`/`RawSearchQuote`) e faz cast — usamos só campos
+    presentes nas variantes equity/ETF.
+- Migrations aplicadas: `0001_init.sql` e `0002_fx_cash_amount.sql` foram
+  rodadas no projeto Supabase (abril/2026).
+- Falta: validar `npm run build` no ambiente do usuário após o pull das
+  últimas mudanças.
 
 ## Decisões Adiadas (Fase 2+)
 
