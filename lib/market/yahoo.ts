@@ -1,4 +1,4 @@
-import YahooFinance from "yahoo-finance2";
+import yfDefault from "yahoo-finance2";
 import type {
   AssetClass,
   AssetSearchResult,
@@ -9,9 +9,18 @@ import type {
 } from "./types";
 
 // yahoo-finance2 v3 deixou de exportar uma instância pronta — agora a default
-// export é a classe e precisamos construir a instância manualmente.
-// suppressNotices silencia avisos do "yahooSurvey" no console do servidor.
-const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+// export é a classe `YahooFinance` e precisamos chamar `new YahooFinance()`
+// para obter um objeto com os métodos reais. Conforme o interop CJS/ESM o
+// `import default` pode chegar como `{ default: Class }` em vez da classe
+// direta; o fallback abaixo cobre os dois cenários. Tipamos como `any`
+// porque os retornos são castados ponto-a-ponto adiante.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const yfMod: any = yfDefault;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const YahooFinanceCtor: any = yfMod?.default ?? yfMod;
+const yahooFinance = new YahooFinanceCtor({
+  suppressNotices: ["yahooSurvey"],
+});
 
 // Forma "achatada" do retorno de yahooFinance.quote(symbol).
 // O tipo nativo do yahoo-finance2 é uma união discriminada por quoteType
