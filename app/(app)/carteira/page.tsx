@@ -13,6 +13,7 @@ import {
 import PortfolioChart, {
   type SeriesPoint,
 } from "@/components/charts/PortfolioChart";
+import { SectionCard, StatCard, Badge } from "@/components/ui/Card";
 
 export const dynamic = "force-dynamic";
 
@@ -52,11 +53,10 @@ export default async function CarteiraPage() {
     })
   );
 
-  // Converte posições em moeda estrangeira para a moeda da carteira (BRL).
-  // Sem câmbio disponível, posições USD entram como 0 e exibimos um aviso.
   const hasUsd = enriched.some(
     ({ holding, quote }) =>
-      (quote?.currency ?? (holding.asset_class === "stock_us" ? "USD" : "BRL")) !==
+      (quote?.currency ??
+        (holding.asset_class === "stock_us" ? "USD" : "BRL")) !==
       portfolio.currency
   );
   const fx = hasUsd ? await getUsdToBrl().catch(() => null) : null;
@@ -64,7 +64,8 @@ export default async function CarteiraPage() {
   const positionsValue = enriched.reduce((acc, { holding, quote }) => {
     const price = quote?.price ?? Number(holding.avg_price);
     const ccy =
-      quote?.currency ?? (holding.asset_class === "stock_us" ? "USD" : "BRL");
+      quote?.currency ??
+      (holding.asset_class === "stock_us" ? "USD" : "BRL");
     const native = holding.quantity * price;
     if (ccy === portfolio.currency) return acc + native;
     if (ccy === "USD" && portfolio.currency === "BRL" && fx) {
@@ -112,31 +113,50 @@ export default async function CarteiraPage() {
       { onConflict: "portfolio_id,taken_on" }
     );
 
+  const updatedLabel = new Date().toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
-    <div className="space-y-8">
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Card
-          label="Patrimônio total"
+    <div className="space-y-5">
+      <div className="mb-6">
+        <h1
+          className="text-[22px] font-extrabold text-ink"
+          style={{ letterSpacing: "-0.03em" }}
+        >
+          Carteira
+        </h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          Atualizado agora · {updatedLabel}
+        </p>
+      </div>
+
+      <section className="grid gap-3.5 sm:grid-cols-3">
+        <StatCard
+          label="Patrimônio Total"
           value={formatCurrency(totalValue, portfolio.currency)}
+          hint="Posições + caixa"
+          icon="◈"
         />
-        <Card
-          label="Saldo em caixa"
+        <StatCard
+          label="Saldo em Caixa"
           value={formatCurrency(portfolio.cash_balance, portfolio.currency)}
-          hint={`de ${formatCurrency(
-            portfolio.initial_cash,
-            portfolio.currency
-          )} iniciais`}
+          hint={`de ${formatCurrency(portfolio.initial_cash, portfolio.currency)} aportados`}
+          icon="◎"
         />
-        <Card
-          label="Resultado"
+        <StatCard
+          label="Resultado Total"
           value={formatCurrency(totalPnL, portfolio.currency)}
-          hint={formatPercent(totalPnLPct)}
+          hint={formatPercent(totalPnLPct) + " desde o início"}
           tone={totalPnL >= 0 ? "positive" : "negative"}
+          icon={totalPnL >= 0 ? "▲" : "▼"}
         />
       </section>
 
       {hasUsd && fx && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-faint">
           Posições em USD convertidas para {portfolio.currency} pelo PTAX do
           BCB ({fx.date}): 1 USD ={" "}
           {fx.rate.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}{" "}
@@ -144,95 +164,124 @@ export default async function CarteiraPage() {
         </p>
       )}
       {hasUsd && !fx && (
-        <p className="rounded bg-red-50 p-2 text-xs text-red-700">
+        <div className="rounded-xl border border-negative-border bg-negative-pastel px-3 py-2 text-xs text-negative">
           Não foi possível obter o câmbio do BCB; posições em USD foram
-          ignoradas no patrimônio total. Tente recarregar.
-        </p>
+          ignoradas no patrimônio total.
+        </div>
       )}
 
-      <section className="rounded-2xl border border-surface-border bg-white p-6">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Evolução do patrimônio
-        </h2>
-        <p className="text-sm text-slate-600">
-          Snapshot diário do valor total da carteira.
-        </p>
-        <div className="mt-4">
-          <PortfolioChart data={series} currency={portfolio.currency} />
-        </div>
-      </section>
+      <SectionCard
+        title="Evolução do patrimônio"
+        subtitle="Snapshot diário do valor total da carteira"
+      >
+        <PortfolioChart data={series} currency={portfolio.currency} />
+      </SectionCard>
 
-      <section className="rounded-2xl border border-surface-border bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Posições</h2>
+      <SectionCard
+        title="Posições"
+        subtitle={`${enriched.length} ${enriched.length === 1 ? "ativo" : "ativos"} em carteira`}
+        action={
           <Link
             href="/mercado"
-            className="text-sm font-medium text-brand hover:underline"
+            className="rounded-lg bg-brand-pastel px-4 py-2 text-xs font-semibold text-brand transition hover:opacity-80"
           >
-            + Comprar ativo
+            + Comprar
           </Link>
-        </div>
-
+        }
+      >
         {enriched.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-600">
+          <p className="text-sm text-ink-muted">
             Você ainda não tem posições. Comece em{" "}
-            <Link href="/mercado" className="text-brand hover:underline">
+            <Link href="/mercado" className="font-semibold text-brand">
               Mercado
             </Link>
             .
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="py-2">Ativo</th>
-                  <th>Qtd.</th>
-                  <th>Preço médio</th>
-                  <th>Cotação</th>
-                  <th>Valor atual</th>
-                  <th>Resultado</th>
-                  <th></th>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-surface-border">
+                  {["Ativo", "Qtd.", "Preço médio", "Cotação", "Variação", "Valor atual", "Resultado"].map(
+                    (h, i) => (
+                      <th
+                        key={h}
+                        className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint ${i === 0 ? "text-left" : "text-right"}`}
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
+                  <th className="w-20"></th>
                 </tr>
               </thead>
               <tbody>
                 {enriched.map(({ holding, quote }) => {
                   const price = quote?.price ?? holding.avg_price;
-                  const ccy = quote?.currency ?? portfolio.currency;
+                  const ccy =
+                    quote?.currency ??
+                    (holding.asset_class === "stock_us" ? "USD" : "BRL");
                   const market = holding.quantity * price;
                   const result = pnl(holding.quantity, holding.avg_price, price);
                   const display = quote?.displayTicker ?? holding.ticker;
+                  const dayChange = quote?.changePercent ?? 0;
                   return (
-                    <tr key={holding.ticker} className="border-t border-surface-border">
-                      <td className="py-3">
+                    <tr
+                      key={holding.ticker}
+                      className="border-b border-surface-border-light transition hover:bg-surface-muted"
+                    >
+                      <td className="px-2.5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-pastel text-[11px] font-extrabold text-brand">
+                            {display.slice(0, 2)}
+                          </div>
+                          <div>
+                            <Link
+                              href={`/ativo/${encodeURIComponent(display)}`}
+                              className="text-[13px] font-bold text-ink hover:text-brand"
+                            >
+                              {display}
+                            </Link>
+                            <div className="mt-0.5 text-[11px] text-ink-faint">
+                              {quote?.name ?? ""}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right font-medium text-ink-muted">
+                        {holding.quantity}
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right text-ink-muted">
+                        {formatCurrency(holding.avg_price, ccy)}
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right font-semibold text-ink">
+                        {formatCurrency(price, ccy)}
+                      </td>
+                      <td className="px-2.5 py-3 text-right">
+                        <Badge value={dayChange} pct={dayChange} />
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right font-semibold text-ink">
+                        {formatCurrency(market, ccy)}
+                      </td>
+                      <td className="px-2.5 py-3 text-right">
+                        <div className="flex flex-col items-end">
+                          <span
+                            className={`tabular text-[13px] font-bold ${result.absolute >= 0 ? "text-positive" : "text-negative"}`}
+                          >
+                            {result.absolute >= 0 ? "+" : ""}
+                            {formatCurrency(result.absolute, ccy)}
+                          </span>
+                          <span
+                            className={`text-[11px] ${result.percent >= 0 ? "text-positive" : "text-negative"}`}
+                          >
+                            {formatPercent(result.percent)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-3 text-right">
                         <Link
                           href={`/ativo/${encodeURIComponent(display)}`}
-                          className="font-medium text-slate-900 hover:text-brand"
-                        >
-                          {display}
-                        </Link>
-                        <div className="text-xs text-slate-500">{quote?.name ?? ""}</div>
-                      </td>
-                      <td>{holding.quantity}</td>
-                      <td>{formatCurrency(holding.avg_price, ccy)}</td>
-                      <td>{formatCurrency(price, ccy)}</td>
-                      <td>{formatCurrency(market, ccy)}</td>
-                      <td
-                        className={
-                          result.absolute >= 0
-                            ? "text-emerald-700"
-                            : "text-red-600"
-                        }
-                      >
-                        {formatCurrency(result.absolute, ccy)}
-                        <span className="ml-1 text-xs">
-                          ({formatPercent(result.percent)})
-                        </span>
-                      </td>
-                      <td>
-                        <Link
-                          href={`/ativo/${encodeURIComponent(display)}`}
-                          className="text-sm text-brand hover:underline"
+                          className="rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand-pastel"
                         >
                           Operar
                         </Link>
@@ -244,35 +293,7 @@ export default async function CarteiraPage() {
             </table>
           </div>
         )}
-      </section>
-    </div>
-  );
-}
-
-function Card({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "positive" | "negative";
-}) {
-  const toneClass =
-    tone === "positive"
-      ? "text-emerald-700"
-      : tone === "negative"
-        ? "text-red-600"
-        : "text-slate-900";
-  return (
-    <div className="rounded-2xl border border-surface-border bg-white p-5">
-      <div className="text-xs uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <div className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
+      </SectionCard>
     </div>
   );
 }

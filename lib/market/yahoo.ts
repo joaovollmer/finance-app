@@ -138,34 +138,72 @@ export async function getHistory(
 export async function searchAssets(
   query: string
 ): Promise<AssetSearchResult[]> {
-  const trimmed = query.trim();
+  const trimmed = query.trim().toUpperCase();
   if (trimmed.length < 1) return [];
 
-  const r = (await yahooFinance.search(trimmed, {
-    quotesCount: 15,
-    newsCount: 0,
-  })) as { quotes?: RawSearchQuote[] };
+  // O /search do Yahoo costuma não devolver o sufixo .SA quando o usuário
+  // digita só "PETR4". Disparamos a busca duas vezes (com e sem .SA) quando o
+  // input casa com o padrão B3 e fundimos os resultados.
+  const isB3Pattern =
+    /^[A-Z]{4}\d{1,2}$/.test(trimmed) && !trimmed.endsWith(B3_SUFFIX);
+  const queries = [trimmed];
+  if (isB3Pattern) queries.push(`${trimmed}${B3_SUFFIX}`);
+
+  const responses = await Promise.all(
+    queries.map((q) =>
+      yahooFinance
+        .search(q, { quotesCount: 10, newsCount: 0 })
+        .catch(() => ({ quotes: [] as RawSearchQuote[] }))
+    )
+  );
+
   const out: AssetSearchResult[] = [];
   const seen = new Set<string>();
 
-  for (const item of r.quotes ?? []) {
-    if (!item.symbol) continue;
-    const { symbol, exchange, quoteType } = item;
-    // Aceitamos apenas equities e ETFs por enquanto; cripto/futuros entram
-    // em fases futuras com suas próprias asset classes.
-    if (quoteType !== "EQUITY" && quoteType !== "ETF") continue;
-    if (seen.has(symbol)) continue;
-    seen.add(symbol);
+  for (const r of responses) {
+    const quotes = (r as { quotes?: RawSearchQuote[] }).quotes ?? [];
+    for (const item of quotes) {
+      if (!item.symbol) continue;
+      const { symbol, exchange, quoteType } = item;
+      if (quoteType !== "EQUITY" && quoteType !== "ETF") continue;
+      if (seen.has(symbol)) continue;
+      seen.add(symbol);
 
-    const isB3 = symbol.endsWith(B3_SUFFIX);
-    out.push({
-      ticker: symbol,
-      displayTicker: isB3 ? symbol.slice(0, -B3_SUFFIX.length) : symbol,
-      name: item.longname ?? item.shortname ?? symbol,
-      assetClass: isB3 ? "stock_br" : "stock_us",
-      exchange,
-    });
+      const isB3 = symbol.endsWith(B3_SUFFIX);
+      out.push({
+        ticker: symbol,
+        displayTicker: isB3 ? symbol.slice(0, -B3_SUFFIX.length) : symbol,
+        name: item.longname ?? item.shortname ?? symbol,
+        assetClass: isB3 ? "stock_br" : "stock_us",
+        exchange,
+      });
+    }
   }
+
+  // Plano B: ticker B3 existe mas /search não retornou nada — confirmamos
+  // direto pelo /quote para não deixar o usuário no vazio.
+  if (out.length === 0 && isB3Pattern) {
+    try {
+      const sym = `${trimmed}${B3_SUFFIX}`;
+      const q = (await yahooFinance.quote(sym)) as RawQuote;
+      out.push({
+        ticker: sym,
+        displayTicker: trimmed,
+        name: q.longName ?? q.shortName ?? trimmed,
+        assetClass: "stock_br",
+        exchange: q.fullExchangeName,
+      });
+    } catch {
+      // ticker inexistente — devolvemos lista vazia
+    }
+  }
+
+  // Match exato no topo, mesmo quando o Yahoo devolve vários "PETR" antes.
+  out.sort((a, b) => {
+    const aExact = a.displayTicker === trimmed ? 0 : 1;
+    const bExact = b.displayTicker === trimmed ? 0 : 1;
+    return aExact - bExact;
+  });
 
   return out;
 }

@@ -48,25 +48,28 @@ export default function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-semibold text-slate-900">
+      <h1
+        className="text-[22px] font-extrabold text-ink"
+        style={{ letterSpacing: "-0.03em" }}
+      >
         Quanto você quer investir?
       </h1>
-      <p className="mt-2 text-slate-600">
+      <p className="mt-1 text-sm text-ink-muted">
         Defina o saldo imaginário inicial da sua carteira. Você poderá ajustar
         depois criando uma nova carteira.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {PRESETS.map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setAmount(v)}
-              className={`rounded-lg border px-3 py-2 text-sm transition ${
+              className={`rounded-xl border-[1.5px] px-3 py-2.5 text-sm font-semibold transition ${
                 amount === v
                   ? "border-brand bg-brand text-white"
-                  : "border-surface-border bg-white text-slate-700 hover:bg-surface-muted"
+                  : "border-surface-border bg-surface text-ink-muted hover:border-brand-border hover:text-ink"
               }`}
             >
               R$ {v.toLocaleString("pt-BR")}
@@ -75,7 +78,7 @@ export default function OnboardingPage() {
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.05em] text-ink-muted">
             Ou um valor personalizado (R$)
           </span>
           <input
@@ -86,16 +89,20 @@ export default function OnboardingPage() {
             onChange={(e) =>
               setAmount(e.target.value === "" ? "" : Number(e.target.value))
             }
-            className="w-full rounded-lg border border-surface-border px-3 py-2 outline-none focus:border-brand"
+            className="w-full rounded-xl border-[1.5px] border-surface-border bg-surface px-3.5 py-3 text-sm text-ink outline-none transition focus:border-brand focus:shadow-glow"
           />
         </label>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <div className="rounded-xl border border-negative-border bg-negative-pastel px-3.5 py-2.5 text-[13px] font-medium text-negative">
+            {error}
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-brand py-2.5 font-medium text-white transition hover:bg-brand-dark disabled:opacity-60"
+          className="rounded-xl bg-brand py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
         >
           {loading ? "Criando carteira..." : "Começar a investir"}
         </button>
