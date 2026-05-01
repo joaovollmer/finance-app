@@ -151,11 +151,18 @@ async function fetchTreasuryLatest(): Promise<TreasuryRow | null> {
   if (cached && Date.now() - cached.fetchedAt < TTL_MS) {
     return (cached.value as unknown as { row: TreasuryRow }).row;
   }
+  // Endpoint correto é "daily_treasury_par_yield_curve_rates" (com "par"); a
+  // versão sem "par" não existe. Brackets dos params precisam de URL encoding.
   const url =
-    "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/daily_treasury_yield_curve_rates" +
-    "?sort=-record_date&page[size]=1";
+    "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/daily_treasury_par_yield_curve_rates" +
+    "?sort=-record_date&page%5Bsize%5D=1";
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Treasury respondeu ${res.status}`);
+  if (!res.ok) {
+    console.error(
+      `[rates] Treasury respondeu ${res.status} — ${await res.text().catch(() => "")}`
+    );
+    throw new Error(`Treasury respondeu ${res.status}`);
+  }
   const json = (await res.json()) as { data?: TreasuryRow[] };
   const row = json.data?.[0] ?? null;
   if (row) {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getQuote } from "@/lib/market/yahoo";
 import { getUsdToBrl } from "@/lib/market/bcb";
+import { getBrRates, getUsRates } from "@/lib/market/rates";
 import {
   formatCurrency,
   formatPercent,
@@ -10,6 +11,11 @@ import {
   type HoldingRow,
   type PortfolioRow,
 } from "@/lib/portfolio/valuation";
+import {
+  describeFixedIncome,
+  valueFixedIncome,
+  type RateSnapshot,
+} from "@/lib/portfolio/fixed_income";
 import PortfolioChart, {
   type SeriesPoint,
 } from "@/components/charts/PortfolioChart";
@@ -42,8 +48,13 @@ export default async function CarteiraPage() {
 
   const holdings = (holdingsRaw ?? []) as HoldingRow[];
 
-  const enriched = await Promise.all(
-    holdings.map(async (h) => {
+  // Particionamos: títulos de RF não passam pelo Yahoo — são marcados a
+  // mercado pela taxa do indexador.
+  const stockHoldings = holdings.filter((h) => h.indexer == null);
+  const bondHoldings = holdings.filter((h) => h.indexer != null);
+
+  const enrichedStocks = await Promise.all(
+    stockHoldings.map(async (h) => {
       try {
         const q = await getQuote(h.ticker);
         return { holding: h, quote: q };
@@ -53,15 +64,46 @@ export default async function CarteiraPage() {
     })
   );
 
-  const hasUsd = enriched.some(
-    ({ holding, quote }) =>
-      (quote?.currency ??
-        (holding.asset_class === "stock_us" ? "USD" : "BRL")) !==
-      portfolio.currency
-  );
+  // Snapshot de taxas para precificar a renda fixa, só busca se houver títulos
+  let rateSnapshot: RateSnapshot = {};
+  if (bondHoldings.length > 0) {
+    const [br, us] = await Promise.all([
+      getBrRates().catch(() => []),
+      getUsRates().catch(() => []),
+    ]);
+    rateSnapshot = {
+      selicAnnual: br.find((r) => r.code === "selic")?.ratePct,
+      cdiAnnual: br.find((r) => r.code === "cdi")?.ratePct,
+      ipcaAnnual: br.find((r) => r.code === "ipca")?.ratePct,
+    };
+    // Para holdings de Treasury, o yield está cravado no fixed_rate da
+    // própria holding (curva no momento da compra), então não precisamos
+    // injetar no snapshot.
+    void us;
+  }
+
+  const enrichedBonds = bondHoldings.map((h) => {
+    const valuation = valueFixedIncome({
+      indexer: h.indexer!,
+      indexPercent: h.index_percent ?? null,
+      fixedRate: h.fixed_rate ?? null,
+      principal: Number(h.principal ?? h.avg_price),
+      purchaseDate: h.purchase_date ?? new Date().toISOString().slice(0, 10),
+      rates: rateSnapshot,
+    });
+    return { holding: h, valuation };
+  });
+
+  const hasUsd =
+    enrichedStocks.some(
+      ({ holding, quote }) =>
+        (quote?.currency ??
+          (holding.asset_class === "stock_us" ? "USD" : "BRL")) !==
+        portfolio.currency
+    ) || bondHoldings.some((h) => h.asset_class === "bond_us");
   const fx = hasUsd ? await getUsdToBrl().catch(() => null) : null;
 
-  const positionsValue = enriched.reduce((acc, { holding, quote }) => {
+  const stocksValue = enrichedStocks.reduce((acc, { holding, quote }) => {
     const price = quote?.price ?? Number(holding.avg_price);
     const ccy =
       quote?.currency ??
@@ -73,6 +115,17 @@ export default async function CarteiraPage() {
     }
     return acc;
   }, 0);
+
+  const bondsValue = enrichedBonds.reduce((acc, { holding, valuation }) => {
+    const ccy = holding.asset_class === "bond_us" ? "USD" : "BRL";
+    if (ccy === portfolio.currency) return acc + valuation.currentValue;
+    if (ccy === "USD" && portfolio.currency === "BRL" && fx) {
+      return acc + valuation.currentValue * fx.rate;
+    }
+    return acc;
+  }, 0);
+
+  const positionsValue = stocksValue + bondsValue;
 
   const totalValue = Number(portfolio.cash_balance) + positionsValue;
   const totalPnL = totalValue - Number(portfolio.initial_cash);
@@ -178,8 +231,8 @@ export default async function CarteiraPage() {
       </SectionCard>
 
       <SectionCard
-        title="Posições"
-        subtitle={`${enriched.length} ${enriched.length === 1 ? "ativo" : "ativos"} em carteira`}
+        title="Ações e ETFs"
+        subtitle={`${enrichedStocks.length} ${enrichedStocks.length === 1 ? "posição" : "posições"} em renda variável`}
         action={
           <Link
             href="/mercado"
@@ -189,13 +242,13 @@ export default async function CarteiraPage() {
           </Link>
         }
       >
-        {enriched.length === 0 ? (
+        {enrichedStocks.length === 0 ? (
           <p className="text-sm text-ink-muted">
-            Você ainda não tem posições. Comece em{" "}
+            Sem posições em ações ainda. Vá ao{" "}
             <Link href="/mercado" className="font-semibold text-brand">
               Mercado
-            </Link>
-            .
+            </Link>{" "}
+            para começar.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -216,7 +269,7 @@ export default async function CarteiraPage() {
                 </tr>
               </thead>
               <tbody>
-                {enriched.map(({ holding, quote }) => {
+                {enrichedStocks.map(({ holding, quote }) => {
                   const price = quote?.price ?? holding.avg_price;
                   const ccy =
                     quote?.currency ??
@@ -285,6 +338,121 @@ export default async function CarteiraPage() {
                         >
                           Operar
                         </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Renda Fixa"
+        subtitle={`${enrichedBonds.length} ${enrichedBonds.length === 1 ? "título" : "títulos"} aplicados`}
+        action={
+          <Link
+            href="/mercado/renda-fixa"
+            className="rounded-lg bg-brand-pastel px-4 py-2 text-xs font-semibold text-brand transition hover:opacity-80"
+          >
+            + Aplicar
+          </Link>
+        }
+      >
+        {enrichedBonds.length === 0 ? (
+          <p className="text-sm text-ink-muted">
+            Sem títulos de renda fixa ainda. Confira as taxas em{" "}
+            <Link
+              href="/mercado/renda-fixa"
+              className="font-semibold text-brand"
+            >
+              Renda Fixa
+            </Link>
+            .
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-surface-border">
+                  {[
+                    "Título",
+                    "Aplicado",
+                    "Taxa",
+                    "Vencimento",
+                    "Valor atual",
+                    "Resultado",
+                  ].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint ${i === 0 ? "text-left" : "text-right"}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {enrichedBonds.map(({ holding, valuation }) => {
+                  const ccy =
+                    holding.asset_class === "bond_us" ? "USD" : "BRL";
+                  const indexerLabel = describeFixedIncome(
+                    holding.indexer!,
+                    holding.index_percent ?? null,
+                    holding.fixed_rate ?? null
+                  );
+                  const principal = Number(
+                    holding.principal ?? holding.avg_price
+                  );
+                  return (
+                    <tr
+                      key={holding.ticker}
+                      className="border-b border-surface-border-light transition hover:bg-surface-muted"
+                    >
+                      <td className="px-2.5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-pastel text-base font-bold text-brand">
+                            ◇
+                          </div>
+                          <div>
+                            <div className="text-[13px] font-bold text-ink">
+                              {indexerLabel}
+                            </div>
+                            <div className="mt-0.5 text-[11px] text-ink-faint">
+                              {holding.indexer === "treasury"
+                                ? "US Treasury"
+                                : "Tesouro Direto / Renda Fixa BR"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right text-ink-muted">
+                        {formatCurrency(principal, ccy)}
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right font-semibold text-ink">
+                        {valuation.effectiveRate.toFixed(2)}% a.a.
+                      </td>
+                      <td className="px-2.5 py-3 text-right text-[12px] text-ink-muted">
+                        {holding.maturity_date ?? "—"}
+                      </td>
+                      <td className="tabular px-2.5 py-3 text-right font-semibold text-ink">
+                        {formatCurrency(valuation.currentValue, ccy)}
+                      </td>
+                      <td className="px-2.5 py-3 text-right">
+                        <div className="flex flex-col items-end">
+                          <span
+                            className={`tabular text-[13px] font-bold ${valuation.pnlAbsolute >= 0 ? "text-positive" : "text-negative"}`}
+                          >
+                            {valuation.pnlAbsolute >= 0 ? "+" : ""}
+                            {formatCurrency(valuation.pnlAbsolute, ccy)}
+                          </span>
+                          <span
+                            className={`text-[11px] ${valuation.pnlPercent >= 0 ? "text-positive" : "text-negative"}`}
+                          >
+                            {formatPercent(valuation.pnlPercent)}
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   );
