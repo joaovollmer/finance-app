@@ -1,4 +1,4 @@
-import type { AssetClass } from "@/lib/market/types";
+import type { AssetClass, FixedIncomeIndexer } from "@/lib/market/types";
 
 export interface HoldingRow {
   portfolio_id: string;
@@ -6,6 +6,13 @@ export interface HoldingRow {
   asset_class: AssetClass;
   quantity: number;
   avg_price: number;
+  // Campos de renda fixa (nullable, populados via migration 0003)
+  indexer?: FixedIncomeIndexer | null;
+  index_percent?: number | null;
+  fixed_rate?: number | null;
+  purchase_date?: string | null;
+  maturity_date?: string | null;
+  principal?: number | null;
 }
 
 export interface PortfolioRow {

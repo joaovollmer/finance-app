@@ -1,4 +1,5 @@
 import type { AssetSummary } from "@/lib/market/types";
+import InfoTooltip, { GLOSSARY } from "@/components/ui/InfoTooltip";
 
 const compactBRL = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -49,90 +50,75 @@ export default function AssetSummaryPanel({
     summary.fiftyTwoWeekHigh !== undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Valor de mercado"
           value={fmtMoney(summary.marketCap, ccy)}
-          hint="Market cap"
+          tooltip={GLOSSARY.marketCap}
         />
         <Stat
           label="P/L (12m)"
           value={fmtNumber(summary.trailingPE)}
-          hint="Preço sobre lucro dos últimos 12 meses"
+          tooltip={GLOSSARY.trailingPE}
         />
         <Stat
           label="P/L projetado"
           value={fmtNumber(summary.forwardPE)}
-          hint="Forward P/E"
+          tooltip={GLOSSARY.forwardPE}
         />
         <Stat
           label="P/VP"
           value={fmtNumber(summary.priceToBook)}
-          hint="Preço sobre valor patrimonial"
+          tooltip={GLOSSARY.priceToBook}
         />
         <Stat
           label="LPA (12m)"
           value={fmtNumber(summary.trailingEps)}
-          hint="Lucro por ação dos últimos 12 meses"
+          tooltip={GLOSSARY.trailingEps}
         />
         <Stat
           label="Dividend yield"
           value={fmtPct(summary.dividendYield)}
+          tooltip={GLOSSARY.dividendYield}
         />
         <Stat
           label="Beta"
           value={fmtNumber(summary.beta)}
-          hint="Volatilidade vs. mercado"
+          tooltip={GLOSSARY.beta}
         />
         <Stat
           label="Variação 12m"
           value={fmtPct(summary.fiftyTwoWeekChangePercent)}
+          tooltip={GLOSSARY.fiftyTwoWeekChangePercent}
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {has52wRange && (
-          <div className="rounded-xl border border-surface-border bg-surface-muted p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-500">
-              Faixa 52 semanas
-            </div>
-            <div className="mt-1 text-sm text-slate-700">
-              {fmtMoney(summary.fiftyTwoWeekLow, ccy)} —{" "}
-              {fmtMoney(summary.fiftyTwoWeekHigh, ccy)}
-            </div>
-          </div>
+          <Block label="Faixa 52 semanas" tooltip={GLOSSARY.fiftyTwoWeekRange}>
+            {fmtMoney(summary.fiftyTwoWeekLow, ccy)} —{" "}
+            {fmtMoney(summary.fiftyTwoWeekHigh, ccy)}
+          </Block>
         )}
-        <div className="rounded-xl border border-surface-border bg-surface-muted p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500">
-            Volume médio
-          </div>
-          <div className="mt-1 text-sm text-slate-700">
-            {summary.averageVolume !== undefined
-              ? compactNumber.format(summary.averageVolume)
-              : "—"}
-          </div>
-        </div>
-        <div className="rounded-xl border border-surface-border bg-surface-muted p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500">
-            Margem líquida
-          </div>
-          <div className="mt-1 text-sm text-slate-700">
-            {fmtPct(summary.profitMargins)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-surface-border bg-surface-muted p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500">
-            Retorno sobre patrimônio
-          </div>
-          <div className="mt-1 text-sm text-slate-700">
-            {fmtPct(summary.returnOnEquity)}
-          </div>
-        </div>
+        <Block label="Volume médio" tooltip={GLOSSARY.averageVolume}>
+          {summary.averageVolume !== undefined
+            ? compactNumber.format(summary.averageVolume)
+            : "—"}
+        </Block>
+        <Block label="Margem líquida" tooltip={GLOSSARY.profitMargins}>
+          {fmtPct(summary.profitMargins)}
+        </Block>
+        <Block
+          label="Retorno sobre patrimônio"
+          tooltip={GLOSSARY.returnOnEquity}
+        >
+          {fmtPct(summary.returnOnEquity)}
+        </Block>
       </div>
 
       {(summary.sector || summary.industry || summary.country) && (
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-ink-faint">
           {summary.sector && <span>Setor: {summary.sector}</span>}
           {summary.industry && (
             <>
@@ -153,7 +139,7 @@ export default function AssetSummaryPanel({
                 href={summary.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand hover:underline"
+                className="font-semibold text-brand hover:underline"
               >
                 site oficial
               </a>
@@ -163,11 +149,11 @@ export default function AssetSummaryPanel({
       )}
 
       {summary.longBusinessSummary && (
-        <details className="rounded-xl border border-surface-border bg-white p-4">
-          <summary className="cursor-pointer text-sm font-medium text-slate-700">
+        <details className="rounded-xl border border-surface-border bg-surface p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-ink">
             Sobre a empresa
           </summary>
-          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-muted">
             {summary.longBusinessSummary}
           </p>
         </details>
@@ -179,19 +165,39 @@ export default function AssetSummaryPanel({
 function Stat({
   label,
   value,
-  hint,
+  tooltip,
 }: {
   label: string;
   value: string;
-  hint?: string;
+  tooltip?: string;
 }) {
   return (
-    <div className="rounded-xl border border-surface-border bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-surface-border-light bg-surface-muted p-4">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
         {label}
+        {tooltip && <InfoTooltip content={tooltip} />}
       </div>
-      <div className="mt-1 text-lg font-semibold text-slate-900">{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-slate-400">{hint}</div>}
+      <div className="tabular mt-1 text-[15px] font-bold text-ink">{value}</div>
+    </div>
+  );
+}
+
+function Block({
+  label,
+  tooltip,
+  children,
+}: {
+  label: string;
+  tooltip?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-surface-border-light bg-surface-muted p-4">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
+        {label}
+        {tooltip && <InfoTooltip content={tooltip} />}
+      </div>
+      <div className="tabular mt-1 text-sm text-ink">{children}</div>
     </div>
   );
 }

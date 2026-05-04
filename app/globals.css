@@ -3,13 +3,53 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  --brand: #4f6bf4;
+  --brand-dark: #3550d4;
+  --brand-pastel: #eef1fe;
+  --brand-border: #c8d0fb;
+  --brand-glow: rgba(79, 107, 244, 0.14);
+
+  --positive: #1ea66d;
+  --positive-pastel: #e3f6ee;
+  --positive-border: #92ddb9;
+
+  --negative: #e04b38;
+  --negative-pastel: #fdeeeb;
+  --negative-border: #f5b2a8;
+
+  --text: #0d1525;
+  --text-muted: #546082;
+  --text-faint: #98a3c0;
+
+  --bg: #f2f5fb;
+  --surface: #ffffff;
+  --border: #dde3f2;
+  --border-light: #ebf0f8;
 }
 
 html,
 body {
   height: 100%;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

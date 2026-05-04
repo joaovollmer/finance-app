@@ -43,7 +43,10 @@ Priorizar APIs gratuitas. Centralizar acesso em uma camada de "data providers" p
 
 ## Convenções de Desenvolvimento
 
-- **Branch de trabalho:** `claude/investment-portfolio-simulator-9ck36`. Todo desenvolvimento ocorre nesta branch.
+- **Branch de trabalho:** `claude/consolidate-v1-release-PtynD` (release 1.0).
+  Branches anteriores `claude/investment-portfolio-simulator-9ck36` e
+  `…-TgkAh` foram consolidadas aqui. Próximas iterações abrem branches
+  `claude/<tema>-<id>` a partir desta.
 - **Commits:** mensagens descritivas em português, focadas no "porquê". Commits pequenos e frequentes.
 - **README.md:** mantém um resumo executivo do estado atual do app. Atualizar a cada marco relevante.
 - **Documentação técnica:** comentários no código apenas quando o "porquê" não for óbvio. Nunca explicar o "o quê".
@@ -51,12 +54,26 @@ Priorizar APIs gratuitas. Centralizar acesso em uma camada de "data providers" p
 
 ## Roadmap (alto nível)
 
-1. **Fase 0 — Fundação** *(em andamento)*: definição de stack, scaffolding, estrutura de pastas.
-2. **Fase 1 — MVP de ações:** buscar cotações, simular compra/venda de ações, persistir carteira local, gráfico de evolução.
-3. **Fase 2 — Múltiplas classes:** ETFs, cripto, renda fixa básica.
-4. **Fase 3 — Fundos e previdência:** integração CVM/ANBIMA.
-5. **Fase 4 — Análise avançada:** benchmarks, métricas (Sharpe, volatilidade, drawdown), exportação.
-6. **Fase 5 — Conteúdo educacional:** tooltips explicativos, glossário, modo "guiado".
+- **v1.0 — Release de fundação** *(atual)*: ações B3+EUA, conversão FX,
+  renda fixa simulada, design system "O Investidor", build verde. Pronto
+  para deploy de teste.
+- **v1.1 — Lançamento público:** Vercel + Supabase prod, observabilidade,
+  rate limit, snapshot via cron, testes automatizados.
+- **v1.2 — Onboarding flexível + fundamentalismo profundo:** saldo inicial
+  opcional (modo deposit-on-buy), DRE/balanço/cashflow, múltiplos históricos,
+  notícias por ativo (yfinance + RSS).
+- **v1.3 — Renda fixa real e fundos:** ingestão CVM (`inf_diario_fi`,
+  `cad_fi`), Tesouro Direto via CSV oficial, ANBIMA (debêntures, IMA), CDB
+  simulado com IR regressivo.
+- **v1.4 — Mercado internacional e macro:** cripto (CoinGecko), ETFs e
+  bolsas adicionais (LSE, Euronext, TSX), FRED (CPI, GDP, Fed Funds),
+  World Bank/IMF, página `/macro`.
+- **v1.5 — Análise quantitativa e predição:** Sharpe/Sortino/drawdown,
+  benchmarks, microserviço Python para predição (RFR → XGBoost → LSTM)
+  com SHAP, backtest walk-forward, UI de previsão por ativo com disclaimer.
+- **v1.6 — Qualidade e UX (contínuo):** cache Redis/Upstash, RSC streaming,
+  acessibilidade WCAG AA, dark mode, glossário em `/aprender`, fila de
+  bug-fix.
 
 ## Stack Técnica (decidida)
 
@@ -90,6 +107,7 @@ components/
   market/{AssetSearch,PriceChart,OrderForm,AssetSummaryPanel}.tsx
 supabase/migrations/0001_init.sql           # schema + RLS + RPC execute_order
 supabase/migrations/0002_fx_cash_amount.sql # cash_amount + execute_order com câmbio
+supabase/migrations/0003_fixed_income.sql   # holdings RF + execute_fixed_income_buy
 middleware.ts                               # protege /(app)/* e atualiza sessão
 ```
 
@@ -136,15 +154,81 @@ middleware.ts                               # protege /(app)/* e atualiza sessã
     símbolo é genérico. `lib/market/yahoo.ts` declara um shape mínimo
     (`RawQuote`/`RawCandle`/`RawSearchQuote`) e faz cast — usamos só campos
     presentes nas variantes equity/ETF.
-- Migrations aplicadas: `0001_init.sql` e `0002_fx_cash_amount.sql` foram
-  rodadas no projeto Supabase (abril/2026).
-- Falta: validar `npm run build` no ambiente do usuário após o pull das
-  últimas mudanças.
+- Migrations aplicadas em prod: `0001_init.sql` e `0002_fx_cash_amount.sql`.
+  `0003_fixed_income.sql` precisa ser rodada antes do release público.
+- `npm run build` validado localmente em maio/2026 na branch
+  `claude/consolidate-v1-release-PtynD` — todos os 14 routes geraram sem
+  erro.
 
-## Decisões Adiadas (Fase 2+)
+### Marco design system "O Investidor" (maio/2026)
 
-- [x] Conversão cambial (BCB SGS) para ativos USD na carteira BRL.
-- [ ] Snapshot diário via cron em vez de upsert no acesso.
-- [ ] Cripto (CoinGecko) e renda fixa básica.
-- [ ] Hospedagem (Vercel + Supabase é o caminho natural).
-- [ ] Testes automatizados (Vitest na Fase 2).
+- **Identidade:** rebranding "O Investidor" — logo geométrico (`components/ui/LogoMark.tsx`),
+  wordmark, tipografia **Plus Jakarta Sans** carregada via `next/font/google`
+  em `app/layout.tsx`.
+- **Tokens CSS:** `app/globals.css` define `--brand`, `--brand-pastel`,
+  `--positive`, `--negative`, `--text/-muted/-faint`, `--bg`, `--surface`,
+  `--border`, `--border-light`. `tailwind.config.ts` mapeia esses tokens para
+  `brand`, `positive`, `negative`, `ink`, `surface`.
+- **Componentes UI base:** `components/ui/Card.tsx` (`SectionCard`,
+  `StatCard`, `Badge`), `components/ui/NavLink.tsx`,
+  `components/auth/AuthShell.tsx` (split layout azul + formulário).
+- **Telas refeitas:** landing (`app/page.tsx`), login/cadastro (split layout),
+  layout autenticado (`app/(app)/layout.tsx` com nav + avatar de iniciais),
+  carteira, mercado, ativo, onboarding, OrderForm, AssetSearch, charts.
+
+### Busca de ativos B3 (fix maio/2026)
+
+- `searchAssets` agora dispara busca paralela com e sem sufixo `.SA` quando o
+  input casa com o padrão B3 (`/^[A-Z]{4}\d{1,2}$/`), faz dedupe por
+  símbolo, e usa `quote()` direto como plano B se nada vier do `/search`. O
+  match exato pelo `displayTicker` é priorizado.
+
+### Renda Fixa (fase 2 — maio/2026)
+
+- `lib/market/rates.ts` expõe `getBrRates()` (BCB SGS séries 432 Selic, 12
+  CDI anualizado em 252 d.u., 433 IPCA acumulado 12m) e `getUsRates()`
+  (US Treasury Fiscal Data — `daily_treasury_yield_curve_rates`, campos
+  `bc_1month`/`bc_1year`/`bc_5year`/`bc_10year`).
+- Todas as séries com cache de 30 min em memória.
+- Página `/mercado/renda-fixa` mostra grid com cards das taxas em duas seções
+  (Brasil e EUA) + nota explicativa.
+- Compra simulada já existe (migration 0003 + `BondOrderForm` + RPC
+  `execute_fixed_income_buy`); marcação a mercado feita pelos indexadores
+  correntes em `lib/portfolio/fixed_income.ts`.
+
+### Tesouro / Treasury simulado (v1.0 — maio/2026)
+
+- Migration `0003_fixed_income.sql`: `holdings.indexer`,
+  `holdings.index_percent`, `holdings.fixed_rate`, `holdings.maturity_date`,
+  `holdings.principal`. RPC `execute_fixed_income_buy` cria a posição e
+  abate o caixa numa transação só.
+- Catálogo em `app/(app)/mercado/renda-fixa/page.tsx`: Tesouro Selic, CDB
+  CDI%, CDB IPCA+, CDB Prefixado, US Treasuries 1M/1A/5A/10A.
+- `BondOrderForm` valida principal, taxa e vencimento; `lib/portfolio/
+  fixed_income.ts` calcula valor de mercado por classe (pós-fixado: principal
+  + acúmulo do indexador no período; prefixado: desconto pela taxa atual).
+- `/carteira` mostra tabela separada para títulos de RF, sinalizando o
+  marker (Selic/CDI/IPCA/PRE/UST).
+
+## Plano de ação pós-1.0
+
+Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
+
+1. **Lançamento (v1.1):** deploy Vercel+Supabase, monitoramento, rate limit,
+   cron de snapshots, smoke tests.
+2. **Onboarding flexível + fundamentos (v1.2):** modo deposit-on-buy,
+   demonstrativos, múltiplos históricos, notícias por ativo.
+3. **Fundos e RF brasileira (v1.3):** ingestão CVM, Tesouro CSV, ANBIMA.
+4. **Internacional + macro (v1.4):** CoinGecko, mais bolsas, FRED, World Bank.
+5. **Quant + predição (v1.5):** métricas avançadas, microserviço Python com
+   RFR/XGBoost/LSTM e SHAP.
+6. **Qualidade contínua (v1.6):** cache, RSC streaming, acessibilidade.
+
+## Decisões pendentes
+
+- [ ] Aplicar migration `0003_fixed_income.sql` em prod.
+- [ ] Snapshot diário via cron (Vercel Cron) — substitui upsert no acesso.
+- [ ] Hospedagem em Vercel + domínio.
+- [ ] Testes automatizados (Vitest unit + Playwright E2E).
+- [ ] Decidir host do microserviço de predição (Railway / Fly / Supabase Edge).
+- [ ] Avaliar caching distribuído (Upstash Redis) para cotações.

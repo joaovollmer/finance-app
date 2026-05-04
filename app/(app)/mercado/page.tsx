@@ -2,23 +2,34 @@ import AssetSearch from "@/components/market/AssetSearch";
 
 export default function MercadoPage() {
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-semibold text-slate-900">Mercado</h1>
-      <p className="mt-1 text-slate-600">
-        Busque um ativo para ver cotação, histórico e operar.
-      </p>
-
-      <div className="mt-6">
-        <AssetSearch />
+    <div>
+      <div className="mb-7">
+        <h1
+          className="text-[22px] font-extrabold text-ink"
+          style={{ letterSpacing: "-0.03em" }}
+        >
+          Mercado
+        </h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          Busque ativos, analise fundamentos e execute ordens
+        </p>
       </div>
 
-      <div className="mt-10 rounded-2xl border border-surface-border bg-white p-5 text-sm text-slate-600">
-        <strong className="block text-slate-900">Dica</strong>
-        Use o código do ticker. Para ações brasileiras, digite{" "}
-        <code className="rounded bg-surface-muted px-1">PETR4</code>,{" "}
-        <code className="rounded bg-surface-muted px-1">VALE3</code>. Para
-        americanas, <code className="rounded bg-surface-muted px-1">AAPL</code>,{" "}
-        <code className="rounded bg-surface-muted px-1">MSFT</code>.
+      <AssetSearch />
+
+      <div className="mt-6 flex items-start gap-3 rounded-xl border border-brand-border bg-brand-pastel p-4 text-[13px] text-brand">
+        <span className="text-lg leading-none" aria-hidden>
+          ◈
+        </span>
+        <span>
+          <strong className="font-bold">Dica:</strong> Use o código do ticker
+          para buscar. Ações BR:{" "}
+          <code className="rounded bg-surface px-1.5 py-0.5">PETR4</code>,{" "}
+          <code className="rounded bg-surface px-1.5 py-0.5">VALE3</code>.
+          Ações EUA:{" "}
+          <code className="rounded bg-surface px-1.5 py-0.5">AAPL</code>,{" "}
+          <code className="rounded bg-surface px-1.5 py-0.5">NVDA</code>.
+        </span>
       </div>
     </div>
   );
