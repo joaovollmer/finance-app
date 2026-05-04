@@ -7,7 +7,8 @@ import {
 } from "@/lib/market/rates";
 import { getUsdToBrl } from "@/lib/market/bcb";
 import { SectionCard } from "@/components/ui/Card";
-import InfoTooltip, { GLOSSARY } from "@/components/ui/InfoTooltip";
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import { GLOSSARY } from "@/lib/glossary";
 import BondOrderForm, {
   type BondOption,
 } from "@/components/market/BondOrderForm";

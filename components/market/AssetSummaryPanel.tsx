@@ -1,5 +1,6 @@
 import type { AssetSummary } from "@/lib/market/types";
-import InfoTooltip, { GLOSSARY } from "@/components/ui/InfoTooltip";
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import { GLOSSARY } from "@/lib/glossary";
 
 const compactBRL = new Intl.NumberFormat("pt-BR", {
   style: "currency",
