@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,9 +18,11 @@ export interface SeriesPoint {
 export default function PortfolioChart({
   data,
   currency = "BRL",
+  height = 220,
 }: {
   data: SeriesPoint[];
   currency?: string;
+  height?: number;
 }) {
   const fmt = new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -29,32 +31,48 @@ export default function PortfolioChart({
   });
 
   return (
-    <div className="h-72 w-full">
+    <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
-        <LineChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+        <AreaChart
+          data={data}
+          margin={{ top: 10, right: 8, bottom: 0, left: 0 }}
+        >
+          <defs>
+            <linearGradient id="brandFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.18} />
+              <stop offset="100%" stopColor="var(--brand)" stopOpacity={0.01} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 12, fill: "#475569" }}
+            tick={{ fontSize: 11, fill: "var(--text-faint)" }}
             minTickGap={32}
+            stroke="var(--border)"
           />
           <YAxis
-            tick={{ fontSize: 12, fill: "#475569" }}
+            tick={{ fontSize: 11, fill: "var(--text-faint)" }}
             tickFormatter={(v) => fmt.format(v)}
-            width={90}
+            width={84}
+            stroke="var(--border)"
           />
           <Tooltip
+            contentStyle={{
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              fontSize: 12,
+            }}
             formatter={(v: number) => fmt.format(v)}
             labelFormatter={(l) => `Data: ${l}`}
           />
-          <Line
+          <Area
             type="monotone"
             dataKey="value"
-            stroke="#0f766e"
+            stroke="var(--brand)"
             strokeWidth={2}
-            dot={false}
+            fill="url(#brandFill)"
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

@@ -43,7 +43,7 @@ Priorizar APIs gratuitas. Centralizar acesso em uma camada de "data providers" p
 
 ## Convenções de Desenvolvimento
 
-- **Branch de trabalho:** `claude/investment-portfolio-simulator-9ck36`. Todo desenvolvimento ocorre nesta branch.
+- **Branch de trabalho:** `claude/investment-portfolio-simulator-TgkAh`. Todo desenvolvimento ocorre nesta branch.
 - **Commits:** mensagens descritivas em português, focadas no "porquê". Commits pequenos e frequentes.
 - **README.md:** mantém um resumo executivo do estado atual do app. Atualizar a cada marco relevante.
 - **Documentação técnica:** comentários no código apenas quando o "porquê" não for óbvio. Nunca explicar o "o quê".
@@ -140,6 +140,42 @@ middleware.ts                               # protege /(app)/* e atualiza sessã
   rodadas no projeto Supabase (abril/2026).
 - Falta: validar `npm run build` no ambiente do usuário após o pull das
   últimas mudanças.
+
+### Marco design system "O Investidor" (maio/2026)
+
+- **Identidade:** rebranding "O Investidor" — logo geométrico (`components/ui/LogoMark.tsx`),
+  wordmark, tipografia **Plus Jakarta Sans** carregada via `next/font/google`
+  em `app/layout.tsx`.
+- **Tokens CSS:** `app/globals.css` define `--brand`, `--brand-pastel`,
+  `--positive`, `--negative`, `--text/-muted/-faint`, `--bg`, `--surface`,
+  `--border`, `--border-light`. `tailwind.config.ts` mapeia esses tokens para
+  `brand`, `positive`, `negative`, `ink`, `surface`.
+- **Componentes UI base:** `components/ui/Card.tsx` (`SectionCard`,
+  `StatCard`, `Badge`), `components/ui/NavLink.tsx`,
+  `components/auth/AuthShell.tsx` (split layout azul + formulário).
+- **Telas refeitas:** landing (`app/page.tsx`), login/cadastro (split layout),
+  layout autenticado (`app/(app)/layout.tsx` com nav + avatar de iniciais),
+  carteira, mercado, ativo, onboarding, OrderForm, AssetSearch, charts.
+
+### Busca de ativos B3 (fix maio/2026)
+
+- `searchAssets` agora dispara busca paralela com e sem sufixo `.SA` quando o
+  input casa com o padrão B3 (`/^[A-Z]{4}\d{1,2}$/`), faz dedupe por
+  símbolo, e usa `quote()` direto como plano B se nada vier do `/search`. O
+  match exato pelo `displayTicker` é priorizado.
+
+### Renda Fixa (fase 2 — maio/2026)
+
+- `lib/market/rates.ts` expõe `getBrRates()` (BCB SGS séries 432 Selic, 12
+  CDI anualizado em 252 d.u., 433 IPCA acumulado 12m) e `getUsRates()`
+  (US Treasury Fiscal Data — `daily_treasury_yield_curve_rates`, campos
+  `bc_1month`/`bc_1year`/`bc_5year`/`bc_10year`).
+- Todas as séries com cache de 30 min em memória.
+- Página `/mercado/renda-fixa` mostra grid com cards das taxas em duas seções
+  (Brasil e EUA) + nota explicativa.
+- Próximo passo (não feito ainda): permitir compra simulada de Tesouro
+  Direto / Treasury com ativos do tipo `bond_br`/`bond_us`, que requer
+  modelo de marcação a mercado simplificado e migration.
 
 ## Decisões Adiadas (Fase 2+)
 

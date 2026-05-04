@@ -15,8 +15,6 @@ interface Props {
   currency: string;
   cashBalance: number;
   ownedQuantity: number;
-  /** Taxa de câmbio para converter `currency` -> `portfolioCurrency`.
-   *  Obrigatória quando as moedas diferem. */
   fxRate?: number;
   fxDate?: string;
 }
@@ -35,12 +33,12 @@ export default function OrderForm({
 }: Props) {
   const router = useRouter();
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [quantity, setQuantity] = useState<number | "">(1);
+  const [quantity, setQuantity] = useState<number>(1);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const qty = typeof quantity === "number" ? quantity : 0;
+  const qty = quantity;
   const totalNative = qty * price;
 
   const needsFx = currency !== portfolioCurrency;
@@ -96,120 +94,155 @@ export default function OrderForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => setSide("buy")}
-          className={`rounded-md py-2 text-sm font-medium transition ${
-            side === "buy"
-              ? "bg-emerald-600 text-white"
-              : "bg-surface-muted text-slate-700 hover:bg-surface-border"
-          }`}
-        >
-          Comprar
-        </button>
-        <button
-          type="button"
-          onClick={() => setSide("sell")}
-          className={`rounded-md py-2 text-sm font-medium transition ${
-            side === "sell"
-              ? "bg-red-600 text-white"
-              : "bg-surface-muted text-slate-700 hover:bg-surface-border"
-          }`}
-        >
-          Vender
-        </button>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-surface-muted p-1">
+        {(["buy", "sell"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSide(s)}
+            className={`rounded-lg py-2 text-[13px] font-bold transition ${
+              side === s
+                ? s === "buy"
+                  ? "bg-positive text-white"
+                  : "bg-negative text-white"
+                : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            {s === "buy" ? "Comprar" : "Vender"}
+          </button>
+        ))}
       </div>
 
-      <label className="block">
-        <span className="mb-1 block text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-semibold uppercase tracking-[0.05em] text-ink-muted">
           Quantidade
         </span>
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={quantity}
-          onChange={(e) =>
-            setQuantity(e.target.value === "" ? "" : Number(e.target.value))
-          }
-          className="w-full rounded-lg border border-surface-border px-3 py-2 outline-none focus:border-brand"
-        />
+        <div className="flex items-center overflow-hidden rounded-xl border-[1.5px] border-surface-border bg-surface">
+          <button
+            type="button"
+            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            className="border-r border-surface-border bg-surface-muted px-3.5 py-2.5 text-base text-ink-muted hover:text-ink"
+          >
+            −
+          </button>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={quantity}
+            onChange={(e) =>
+              setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+            }
+            className="tabular flex-1 border-none bg-transparent py-2.5 text-center text-base font-bold text-ink outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setQuantity((q) => q + 1)}
+            className="border-l border-surface-border bg-surface-muted px-3.5 py-2.5 text-base text-ink-muted hover:text-ink"
+          >
+            +
+          </button>
+        </div>
       </label>
 
-      <div className="rounded-lg bg-surface-muted p-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-slate-600">Cotação</span>
-          <span className="font-medium">{formatCurrency(price, currency)}</span>
-        </div>
-        <div className="mt-1 flex justify-between">
-          <span className="text-slate-600">Total estimado</span>
-          <span className="font-semibold">
-            {formatCurrency(totalNative, currency)}
-          </span>
-        </div>
+      <div className="flex flex-col gap-1.5 rounded-xl border border-surface-border-light bg-surface-muted px-3.5 py-3">
+        <Row label="Cotação" value={formatCurrency(price, currency)} />
+        <Row
+          label="Total estimado"
+          value={formatCurrency(totalNative, currency)}
+          bold
+        />
         {needsFx && (
           <>
-            <div className="mt-1 flex justify-between text-xs text-slate-500">
-              <span>
-                Câmbio {currency}/{portfolioCurrency}
-                {fxDate ? ` · ${fxDate}` : ""}
-              </span>
-              <span>
-                {fxRate
-                  ? fxRate.toLocaleString("pt-BR", { maximumFractionDigits: 4 })
-                  : "—"}
-              </span>
-            </div>
-            <div className="mt-1 flex justify-between">
-              <span className="text-slate-600">
-                Total em {portfolioCurrency}
-              </span>
-              <span className="font-semibold">
-                {formatCurrency(cashAmount, portfolioCurrency)}
-              </span>
-            </div>
+            <Row
+              label={`Câmbio ${currency}/${portfolioCurrency}${fxDate ? ` · ${fxDate}` : ""}`}
+              value={
+                fxRate
+                  ? fxRate.toLocaleString("pt-BR", {
+                      maximumFractionDigits: 4,
+                    })
+                  : "—"
+              }
+              hint
+            />
+            <Row
+              label={`Total em ${portfolioCurrency}`}
+              value={formatCurrency(cashAmount, portfolioCurrency)}
+              bold
+            />
           </>
         )}
-        <div className="mt-1 flex justify-between text-xs text-slate-500">
-          <span>Saldo em caixa</span>
-          <span>{formatCurrency(cashBalance, portfolioCurrency)}</span>
-        </div>
+        <Row
+          label="Saldo em caixa"
+          value={formatCurrency(cashBalance, portfolioCurrency)}
+          hint
+        />
         {ownedQuantity > 0 && (
-          <div className="flex justify-between text-xs text-slate-500">
-            <span>Posição atual</span>
-            <span>{ownedQuantity}</span>
-          </div>
+          <Row label="Posição atual" value={`${ownedQuantity} unid.`} hint />
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {info && <p className="text-sm text-emerald-700">{info}</p>}
+      {error && (
+        <div className="rounded-xl border border-negative-border bg-negative-pastel px-3.5 py-2.5 text-[13px] font-medium text-negative">
+          {error}
+        </div>
+      )}
+      {info && (
+        <div className="rounded-xl border border-positive-border bg-positive-pastel px-3.5 py-2.5 text-[13px] font-medium text-positive">
+          ✓ {info}
+        </div>
+      )}
 
       <button
         type="submit"
         disabled={loading}
-        className={`w-full rounded-lg py-2.5 font-medium text-white transition disabled:opacity-60 ${
-          side === "buy"
-            ? "bg-emerald-600 hover:bg-emerald-700"
-            : "bg-red-600 hover:bg-red-700"
+        className={`rounded-xl py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60 ${
+          side === "buy" ? "bg-positive" : "bg-negative"
         }`}
+        style={{ letterSpacing: "-0.01em" }}
       >
         {loading
           ? "Executando..."
           : side === "buy"
-            ? "Confirmar compra"
-            : "Confirmar venda"}
+            ? `Confirmar compra · ${formatCurrency(needsFx ? cashAmount : totalNative, needsFx ? portfolioCurrency : currency)}`
+            : `Confirmar venda · ${formatCurrency(needsFx ? cashAmount : totalNative, needsFx ? portfolioCurrency : currency)}`}
       </button>
 
-      <p className="text-xs text-slate-500">
-        A ordem é executada na cotação atual exibida. Cotações fora do horário
-        de pregão usam o último preço disponível.
+      <p className="text-[11px] leading-relaxed text-ink-faint">
+        Ordem executada na cotação atual exibida. Cotações fora do pregão usam
+        o último preço disponível.
         {needsFx
-          ? " Para ativos em moeda estrangeira, usamos o PTAX do BCB para converter ao saldo em caixa."
+          ? " Para ativos em moeda estrangeira, usamos o PTAX do BCB."
           : ""}
       </p>
     </form>
+  );
+}
+
+function Row({
+  label,
+  value,
+  bold,
+  hint,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  hint?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span
+        className={`${hint ? "text-[11px]" : "text-xs"} text-ink-muted`}
+      >
+        {label}
+      </span>
+      <span
+        className={`tabular text-[13px] ${bold ? "font-bold text-ink" : "font-medium text-ink"}`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

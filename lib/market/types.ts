@@ -1,4 +1,22 @@
-export type AssetClass = "stock_br" | "stock_us";
+export type AssetClass = "stock_br" | "stock_us" | "bond_br" | "bond_us";
+
+export type FixedIncomeIndexer =
+  | "selic"
+  | "cdi"
+  | "ipca"
+  | "prefixed"
+  | "treasury";
+
+export interface FixedIncomeHolding {
+  ticker: string;
+  assetClass: "bond_br" | "bond_us";
+  indexer: FixedIncomeIndexer;
+  indexPercent: number | null;
+  fixedRate: number | null;
+  purchaseDate: string;
+  maturityDate: string | null;
+  principal: number;
+}
 
 export type HistoryRange = "1mo" | "3mo" | "6mo" | "1y" | "2y" | "5y";
 
