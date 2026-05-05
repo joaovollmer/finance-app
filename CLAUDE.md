@@ -224,11 +224,24 @@ Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
    RFR/XGBoost/LSTM e SHAP.
 6. **Qualidade contínua (v1.6):** cache, RSC streaming, acessibilidade.
 
-## Decisões pendentes
+## v1.1 — Sprint A (em andamento)
 
-- [ ] Aplicar migration `0003_fixed_income.sql` em prod.
-- [ ] Snapshot diário via cron (Vercel Cron) — substitui upsert no acesso.
-- [ ] Hospedagem em Vercel + domínio.
-- [ ] Testes automatizados (Vitest unit + Playwright E2E).
+- [x] `vercel.json` com cron diário 03:00 UTC em `/api/cron/snapshot`.
+- [x] Rota cron protegida por `CRON_SECRET` (header `Authorization` ou
+  query `?secret=` para debug). Usa `SUPABASE_SERVICE_ROLE_KEY` via
+  `lib/supabase/admin.ts` para iterar todos os portfolios bypassando RLS.
+- [x] Lógica de valuation extraída para `lib/portfolio/total_value.ts`,
+  reutilizada por `/carteira` e pelo cron — fim do upsert in-line.
+- [x] `@vercel/analytics` integrado no `app/layout.tsx`.
+- [ ] Deploy na Vercel + env vars (responsabilidade do operador).
+- [ ] Migration `0003_fixed_income.sql` no Supabase prod.
+
+## Pendências subsequentes (Sprint B+)
+
+- [ ] Rate limiting `/api/*` (Upstash Ratelimit, fallback in-memory).
+- [ ] Sentry SDK com DSN opcional via env.
+- [ ] Vitest + Playwright + GitHub Actions CI.
+- [ ] Páginas legais (`/privacidade`, `/termos`) + footer + banner de
+  simulação educacional.
 - [ ] Decidir host do microserviço de predição (Railway / Fly / Supabase Edge).
 - [ ] Avaliar caching distribuído (Upstash Redis) para cotações.
