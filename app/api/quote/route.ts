@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getQuote } from "@/lib/market/yahoo";
+import { withRateLimit } from "@/lib/api/with-rate-limit";
 
 const QuerySchema = z.object({
   ticker: z.string().min(1).max(20),
 });
 
-export async function GET(request: Request) {
+export const GET = withRateLimit(async (request: Request) => {
   const { searchParams } = new URL(request.url);
   const parsed = QuerySchema.safeParse({ ticker: searchParams.get("ticker") });
   if (!parsed.success) {
@@ -24,4 +25,4 @@ export async function GET(request: Request) {
       { status: 404 }
     );
   }
-}
+});

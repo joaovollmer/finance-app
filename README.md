@@ -94,6 +94,25 @@ npm run dev
 Acesse `http://localhost:3000`. Crie uma conta, defina o saldo inicial e
 comece a operar.
 
+## Observabilidade e proteção (v1.1 — Sprint B)
+
+Os endpoints `/api/*` (exceto cron) passam por um rate limiter por IP:
+
+- **Com Upstash Redis** (recomendado em prod): defina
+  `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`. Janela deslizante
+  de 60 req/min/IP, distribuído entre instâncias.
+- **Sem Upstash:** fallback in-memory por instância serverless. OK em dev,
+  fraco em prod (cada instância da Vercel mantém seu próprio contador).
+
+Sentry é instalado mas só ativa quando o DSN existe:
+
+- `NEXT_PUBLIC_SENTRY_DSN` (obrigatório pra captura no client)
+- `SENTRY_DSN` (server, geralmente o mesmo)
+- `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` (opcionais — só pra
+  upload de sourcemaps na build)
+
+Sem essas vars, o SDK é no-op e a build prossegue normalmente.
+
 ## Plano de ação — pós-1.0
 
 A versão 1.0 fecha o MVP com renda variável + renda fixa simulada. As próximas

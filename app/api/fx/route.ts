@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getUsdToBrl } from "@/lib/market/bcb";
+import { withRateLimit } from "@/lib/api/with-rate-limit";
 
-export async function GET() {
+export const GET = withRateLimit(async () => {
   try {
     const fx = await getUsdToBrl();
     return NextResponse.json(fx, {
@@ -13,4 +14,4 @@ export async function GET() {
       { status: 502 }
     );
   }
-}
+});
