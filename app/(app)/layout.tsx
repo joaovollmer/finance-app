@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import LogoutButton from "@/components/auth/LogoutButton";
 import LogoMark, { Wordmark } from "@/components/ui/LogoMark";
 import NavLink from "@/components/ui/NavLink";
+import Footer from "@/components/ui/Footer";
+import SimBanner from "@/components/ui/SimBanner";
 
 export default async function AppLayout({
   children,
@@ -22,7 +24,8 @@ export default async function AppLayout({
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-surface-muted">
+    <div className="flex min-h-screen flex-col bg-surface-muted">
+      <SimBanner />
       <header className="sticky top-0 z-40 border-b border-surface-border bg-surface">
         <div className="mx-auto flex h-[60px] max-w-[1200px] items-center justify-between px-6">
           <Link href="/carteira" className="flex items-center gap-2.5">
@@ -45,9 +48,10 @@ export default async function AppLayout({
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-[1200px] animate-fade-up px-6 py-8">
+      <main className="mx-auto w-full max-w-[1200px] flex-1 animate-fade-up px-6 py-8">
         {children}
       </main>
+      <Footer />
     </div>
   );
 }

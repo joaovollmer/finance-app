@@ -1,9 +1,11 @@
 import Link from "next/link";
 import LogoMark from "@/components/ui/LogoMark";
+import Footer from "@/components/ui/Footer";
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-surface-muted">
+    <div className="flex min-h-screen flex-col bg-surface-muted">
+    <main className="flex-1">
       <header className="mx-auto flex h-[60px] max-w-[1200px] items-center justify-between px-6">
         <div className="flex items-center gap-2.5">
           <LogoMark size={30} />
@@ -92,5 +94,7 @@ export default function HomePage() {
         </ul>
       </section>
     </main>
+    <Footer />
+    </div>
   );
 }

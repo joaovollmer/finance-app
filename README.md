@@ -69,6 +69,7 @@ supabase/migrations/
   0003_fixed_income.sql             # holdings RF + execute_fixed_income_buy
   0004_bond_asset_class.sql         # amplia asset_class_check para bond_*
   0005_schema_migrations.sql        # tabela _migrations + histórico
+  0006_migrations_rls.sql           # RLS em _migrations (nega acesso anon)
 instrumentation.ts                  # carrega Sentry server/edge config
 sentry.{client,server,edge}.config.ts
 ```
@@ -268,10 +269,11 @@ Dividida em sprints, cada uma virando uma branch
   - Vitest: 22 testes cobrindo `lib/portfolio/*` e `lib/market/bcb.ts`.
   - Playwright: smoke da landing pública (heading, /cadastro, /login).
   - GitHub Actions: lint + typecheck + unit em cada PR; E2E no merge.
-- **Sprint D — Páginas legais + LGPD básica**
-  - `/privacidade`, `/termos`, footer com links.
-  - Banner global "Simulação educacional — não é recomendação financeira".
-  - Cookie/local-storage notice mínimo.
+- **Sprint D — Páginas legais + LGPD básica** ✅
+  - `/privacidade` e `/termos` (públicas, acessíveis pelo footer).
+  - `Footer` com links de privacidade/termos na landing e na área autenticada.
+  - `SimBanner` educacional fixo no topo da área autenticada.
+  - Migration `0006`: RLS em `public._migrations` (nega acesso via PostgREST).
 
 ### Fase 1.2 — Onboarding flexível e fundamentos (semanas 2–4)
 
