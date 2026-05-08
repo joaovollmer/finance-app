@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AssetClass } from "@/lib/market/types";
 import { formatCurrency } from "@/lib/portfolio/valuation";
@@ -81,6 +82,10 @@ export default function OrderForm({
     setLoading(false);
 
     if (error) {
+      Sentry.captureException(error, {
+        tags: { area: "stock_order", rpc: "execute_order" },
+        extra: { ticker, asset_class: assetClass, side, quantity: qty },
+      });
       setError(error.message);
       return;
     }
