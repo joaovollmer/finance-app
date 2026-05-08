@@ -96,6 +96,25 @@ npm run dev
 Acesse `http://localhost:3000`. Crie uma conta, defina o saldo inicial e
 comece a operar.
 
+## Testes
+
+Duas camadas, conforme a Sprint C:
+
+```bash
+# Unit (Vitest) — funções puras de portfolio/market, < 1s
+npm run test
+npm run test:watch   # modo watch para desenvolvimento
+
+# E2E (Playwright) — smoke da landing pública
+npx playwright install chromium   # 1ª vez, baixa o browser
+npm run build                     # E2E roda contra `next start`
+npm run test:e2e
+```
+
+Em CI, o GitHub Actions (`.github/workflows/ci.yml`) roda lint, typecheck
+e unit em cada PR; E2E roda em paralelo mas não bloqueia merge enquanto
+a suíte está pequena.
+
 ## Observabilidade e proteção (v1.1 — Sprints B + hotfix)
 
 Os endpoints `/api/*` (exceto cron) passam por um rate limiter por IP:
@@ -245,10 +264,10 @@ Dividida em sprints, cada uma virando uma branch
   - US Treasury com fallback Yahoo (`^IRX/^FVX/^TNX/^TYX`) para quando
     o `fiscaldata.treasury.gov` falhar.
   - Migration `0005` introduzindo `public._migrations` para rastreio.
-- **Sprint C — Testes + CI** (próximo)
-  - Vitest cobrindo `lib/portfolio/*` e `lib/market/{bcb,rates}.ts`.
-  - Playwright nos fluxos críticos (auth → onboarding → compra).
-  - GitHub Actions rodando lint + typecheck + unit em cada PR.
+- **Sprint C — Testes + CI** ✅
+  - Vitest: 22 testes cobrindo `lib/portfolio/*` e `lib/market/bcb.ts`.
+  - Playwright: smoke da landing pública (heading, /cadastro, /login).
+  - GitHub Actions: lint + typecheck + unit em cada PR; E2E no merge.
 - **Sprint D — Páginas legais + LGPD básica**
   - `/privacidade`, `/termos`, footer com links.
   - Banner global "Simulação educacional — não é recomendação financeira".

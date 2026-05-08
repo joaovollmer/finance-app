@@ -8,7 +8,7 @@ export const GET = withRateLimit(async () => {
     return NextResponse.json(fx, {
       headers: { "Cache-Control": "s-maxage=900, stale-while-revalidate=1800" },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: "câmbio indisponível" },
       { status: 502 }

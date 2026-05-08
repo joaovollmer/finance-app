@@ -26,7 +26,7 @@ export const GET = withRateLimit(async (request: Request) => {
         headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
       }
     );
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: "histórico indisponível" },
       { status: 404 }
