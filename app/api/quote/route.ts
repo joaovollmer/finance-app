@@ -19,7 +19,7 @@ export const GET = withRateLimit(async (request: Request) => {
     return NextResponse.json(quote, {
       headers: { "Cache-Control": "s-maxage=15, stale-while-revalidate=30" },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: "ativo não encontrado" },
       { status: 404 }

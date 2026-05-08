@@ -94,6 +94,25 @@ npm run dev
 Acesse `http://localhost:3000`. Crie uma conta, defina o saldo inicial e
 comece a operar.
 
+## Testes
+
+Duas camadas, conforme a Sprint C:
+
+```bash
+# Unit (Vitest) — funções puras de portfolio/market, < 1s
+npm run test
+npm run test:watch   # modo watch para desenvolvimento
+
+# E2E (Playwright) — smoke da landing pública
+npx playwright install chromium   # 1ª vez, baixa o browser
+npm run build                     # E2E roda contra `next start`
+npm run test:e2e
+```
+
+Em CI, o GitHub Actions (`.github/workflows/ci.yml`) roda lint, typecheck
+e unit em cada PR; E2E roda em paralelo mas não bloqueia merge enquanto
+a suíte está pequena.
+
 ## Observabilidade e proteção (v1.1 — Sprint B)
 
 Os endpoints `/api/*` (exceto cron) passam por um rate limiter por IP:
