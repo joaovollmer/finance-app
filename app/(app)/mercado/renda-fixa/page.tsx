@@ -20,10 +20,11 @@ const RATE_GLOSSARY: Record<string, string> = {
   selic: GLOSSARY.selic,
   cdi: GLOSSARY.cdi,
   ipca: GLOSSARY.ipca,
-  ust_1m: GLOSSARY.treasuryYield,
+  ust_3m: GLOSSARY.treasuryYield,
   ust_1y: GLOSSARY.treasuryYield,
   ust_5y: GLOSSARY.treasuryYield,
   ust_10y: GLOSSARY.treasuryYield,
+  ust_30y: GLOSSARY.treasuryYield,
 };
 
 export default async function RendaFixaPage() {
@@ -84,7 +85,7 @@ export default async function RendaFixaPage() {
 
           <SectionCard
             title="Estados Unidos"
-            subtitle="US Treasury Fiscal Data · Curva de juros"
+            subtitle="US Treasury · Curva de juros (com fallback Yahoo)"
           >
             {usRates.length === 0 ? (
               <Empty source="US Treasury" />
@@ -221,14 +222,15 @@ function defaultMaturityForCode(code: string): string {
     d.setFullYear(d.getFullYear() + years);
     return d.toISOString().slice(0, 10);
   };
-  if (code === "ust_1m") {
+  if (code === "ust_3m") {
     const d = new Date(today);
-    d.setMonth(d.getMonth() + 1);
+    d.setMonth(d.getMonth() + 3);
     return d.toISOString().slice(0, 10);
   }
   if (code === "ust_1y") return add(1);
   if (code === "ust_5y") return add(5);
   if (code === "ust_10y") return add(10);
+  if (code === "ust_30y") return add(30);
   return add(1);
 }
 
