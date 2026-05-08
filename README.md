@@ -94,6 +94,34 @@ npm run dev
 Acesse `http://localhost:3000`. Crie uma conta, defina o saldo inicial e
 comece a operar.
 
+## Deploy na Vercel
+
+1. **Crie um projeto** em [vercel.com/new](https://vercel.com/new) e conecte
+   o repositório `joaovollmer/finance-app`. Use o branch `main`.
+2. Em **Project Settings → Environment Variables**, adicione:
+   - `NEXT_PUBLIC_SUPABASE_URL` — URL do projeto Supabase prod
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — chave `anon` do mesmo projeto
+   - `SUPABASE_SERVICE_ROLE_KEY` — chave `service_role` (apenas servidor —
+     usada pelo cron pra bypassar RLS)
+   - `CRON_SECRET` — segredo aleatório para autenticar o Vercel Cron.
+     Gere com `openssl rand -hex 32`.
+3. **Cron diário:** o `vercel.json` na raiz já configura
+   `/api/cron/snapshot` rodando às 03:00 UTC todo dia. A primeira execução
+   acontece automaticamente após o primeiro deploy bem-sucedido.
+4. **Aplicar migrations no Supabase prod** (SQL Editor → New Query) na
+   ordem: `0001_init.sql`, `0002_fx_cash_amount.sql`, `0003_fixed_income.sql`.
+5. Apertar **Deploy**. As builds subsequentes em `main` viram preview/prod
+   automáticos.
+
+### Testando o cron localmente
+
+```bash
+# defina CRON_SECRET no .env.local primeiro
+curl "http://localhost:3000/api/cron/snapshot?secret=$CRON_SECRET"
+```
+
+A resposta lista `total_portfolios`, `succeeded`, `failed` e os IDs.
+
 ## Plano de ação — pós-1.0
 
 A versão 1.0 fecha o MVP com renda variável + renda fixa simulada. As próximas

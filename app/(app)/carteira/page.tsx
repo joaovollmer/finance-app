@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getQuote } from "@/lib/market/yahoo";
 import { getUsdToBrl } from "@/lib/market/bcb";
-import { getBrRates, getUsRates } from "@/lib/market/rates";
+import { getBrRates } from "@/lib/market/rates";
 import {
   formatCurrency,
   formatPercent,
@@ -64,22 +64,14 @@ export default async function CarteiraPage() {
     })
   );
 
-  // Snapshot de taxas para precificar a renda fixa, só busca se houver títulos
   let rateSnapshot: RateSnapshot = {};
   if (bondHoldings.length > 0) {
-    const [br, us] = await Promise.all([
-      getBrRates().catch(() => []),
-      getUsRates().catch(() => []),
-    ]);
+    const br = await getBrRates().catch(() => []);
     rateSnapshot = {
       selicAnnual: br.find((r) => r.code === "selic")?.ratePct,
       cdiAnnual: br.find((r) => r.code === "cdi")?.ratePct,
       ipcaAnnual: br.find((r) => r.code === "ipca")?.ratePct,
     };
-    // Para holdings de Treasury, o yield está cravado no fixed_rate da
-    // própria holding (curva no momento da compra), então não precisamos
-    // injetar no snapshot.
-    void us;
   }
 
   const enrichedBonds = bondHoldings.map((h) => {
@@ -140,6 +132,7 @@ export default async function CarteiraPage() {
     .eq("portfolio_id", portfolio.id)
     .order("taken_on", { ascending: true });
 
+  const today = new Date().toISOString().slice(0, 10);
   const series: SeriesPoint[] = [
     {
       date: portfolio.created_at.slice(0, 10),
@@ -149,22 +142,10 @@ export default async function CarteiraPage() {
       (s) => ({ date: s.taken_on, value: s.total_value })
     ),
     {
-      date: new Date().toISOString().slice(0, 10),
+      date: today,
       value: totalValue,
     },
   ];
-
-  const today = new Date().toISOString().slice(0, 10);
-  await supabase
-    .from("portfolio_snapshots")
-    .upsert(
-      {
-        portfolio_id: portfolio.id,
-        taken_on: today,
-        total_value: Number(totalValue.toFixed(2)),
-      },
-      { onConflict: "portfolio_id,taken_on" }
-    );
 
   const updatedLabel = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
