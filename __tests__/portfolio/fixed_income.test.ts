@@ -93,7 +93,10 @@ describe("valueFixedIncome — IPCA+ e prefixado", () => {
       rates: {},
     });
     expect(r.effectiveRate).toBe(4.5);
-    expect(r.currentValue).toBeCloseTo(10000 * Math.pow(1.045, 2), 0);
+    // 2 anos a 4,5% = ~10920. Tolerância maior porque o cálculo usa dias
+    // corridos a partir de yearsAgo(2), o que varia com a data atual.
+    expect(r.currentValue).toBeGreaterThan(10915);
+    expect(r.currentValue).toBeLessThan(10930);
   });
 });
 
