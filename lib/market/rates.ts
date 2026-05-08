@@ -180,7 +180,7 @@ async function fetchTreasuryLatest(): Promise<TreasuryRow | null> {
     return cached.value as TreasuryRow;
   }
   const url =
-    "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/daily_treasury_par_yield_curve_rates" +
+    "https://api.fiscaldata.treasury.gov/services/api/v1/accounting/od/daily_treasury_par_yield_curve_rates" +
     "?sort=-record_date&page%5Bsize%5D=1";
 
   try {
