@@ -224,6 +224,38 @@ Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
    RFR/XGBoost/LSTM e SHAP.
 6. **Qualidade contínua (v1.6):** cache, RSC streaming, acessibilidade.
 
+## v1.2 — Sprint C (notícias por ativo) — maio/2026
+
+Branch: `claude/v1.2-news-sprint-c`. Primeiro entregável da v1.2 (warm-up
+de menor escopo, sem migration).
+
+- **`lib/market/news.ts`:** `getAssetNews(ticker, limit=8)` com cache 15min
+  em memória. Tenta primeiro `yahooFinance.search(symbol, { newsCount })` —
+  normaliza ticker para `.SA` quando casa com padrão B3. Se devolver vazio
+  (ou jogar exception), faz fallback para Google News RSS
+  (`https://news.google.com/rss/search?q=<displayTicker>+ações&hl=pt-BR&...`).
+  Erros das duas fontes são capturados via `Sentry.captureException` com
+  tag `area=news,source=yahoo|google_rss` — nunca propagam.
+- **Parser RSS in-house:** `parseGoogleNewsRss(xml, limit)` com regex em
+  `<item>/<title>/<link>/<pubDate>/<source>` + decode de entidades HTML
+  básicas. Evita adicionar `fast-xml-parser` ou similar. Testado.
+- **Endpoint `/api/news`:** Zod (`ticker` 1-20 chars, `limit` 1-20),
+  `withRateLimit` reaproveitando o limiter existente,
+  `Cache-Control: s-maxage=900, stale-while-revalidate=1800`.
+- **`NewsPanel` (server component):** lista cards com thumbnail (quando
+  Yahoo retorna), título (line-clamp-2), publisher e tempo relativo
+  (`Intl.RelativeTimeFormat`). Empty state amigável. Links abrem em nova
+  aba com `rel="noopener noreferrer"`.
+- **Integração:** `app/(app)/ativo/[ticker]/page.tsx` adiciona
+  `getAssetNews(decoded).catch(() => [])` no `Promise.all` existente — não
+  bloqueia a página se notícias falharem. Card aparece abaixo de
+  Fundamentos.
+- **Testes:** `__tests__/market/news.test.ts` (6 testes do parser RSS).
+  Build verde, 28 testes no total.
+- **Próximas sprints v1.2:** Sprint A (onboarding deposit-on-buy +
+  migration 0007) e Sprint B (fundamentalismo profundo via mais módulos
+  do `quoteSummary` + peers curados).
+
 ## v1.1 — Sprint A (em andamento)
 
 - [x] `vercel.json` com cron diário 03:00 UTC em `/api/cron/snapshot`.

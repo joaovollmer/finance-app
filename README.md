@@ -31,6 +31,8 @@ A linguagem é acessível ao leigo, mas os dados têm profundidade para o avanç
   via BCB SGS + Treasury Fiscal Data.
 - **Dashboard `/carteira`** com patrimônio total, P&L, posições de RV e RF,
   gráfico de evolução com snapshot diário.
+- **Notícias por ativo** (v1.2 — Sprint C): manchetes recentes via Yahoo
+  Finance com fallback para Google News RSS, exibidas no detalhe do ativo.
 - **Design system "O Investidor"** (Plus Jakarta Sans, tokens pastéis,
   SectionCard/StatCard/Badge, InfoTooltip com glossário).
 - **Build de produção verde** (`npm run build`).
@@ -54,14 +56,14 @@ app/
     carteira/                       # dashboard
     mercado/                        # busca + página de renda fixa
     ativo/[ticker]/                 # detalhe + gráfico + OrderForm
-  api/{quote,history,search,fx}/    # endpoints sobre os providers
+  api/{quote,history,search,fx,news}/ # endpoints sobre os providers
 lib/
-  market/{yahoo,bcb,rates,types}.ts
+  market/{yahoo,bcb,rates,news,types}.ts
   portfolio/{valuation,fixed_income}.ts
 components/
   auth/{AuthShell,LogoutButton}.tsx
   charts/PortfolioChart.tsx
-  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel}.tsx
+  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,NewsPanel}.tsx
   ui/{Card,InfoTooltip,LogoMark,NavLink}.tsx
 supabase/migrations/
   0001_init.sql                     # schema + RLS + RPC execute_order
@@ -286,8 +288,9 @@ Dividida em sprints, cada uma virando uma branch
   - Múltiplos históricos (P/L, P/VP, EV/EBITDA), payout, dívida líquida/EBITDA.
   - Histórico de dividendos, splits e recomendações de analistas.
   - Comparação setorial (peers).
-- Notícias do ativo: agregação de manchetes via `yahoo-finance2.search().news`
-  + RSS do Google News como fallback, exibidas como cards com hyperlink.
+- Notícias do ativo ✅ (Sprint C): agregação de manchetes via
+  `yahoo-finance2.search().news` com fallback para RSS do Google News,
+  exibidas como cards com hyperlink em `/ativo/[ticker]`.
 
 ### Fase 1.3 — Renda fixa e fundos via fontes brasileiras (semanas 4–8)
 

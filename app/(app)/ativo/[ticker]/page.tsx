@@ -3,10 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAssetSummary, getHistory, getQuote } from "@/lib/market/yahoo";
 import { getUsdToBrl } from "@/lib/market/bcb";
+import { getAssetNews } from "@/lib/market/news";
 import { formatCurrency } from "@/lib/portfolio/valuation";
 import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
 import AssetSummaryPanel from "@/components/market/AssetSummaryPanel";
+import NewsPanel from "@/components/market/NewsPanel";
 import { SectionCard, Badge } from "@/components/ui/Card";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +30,13 @@ export default async function AtivoPage({
   let quote;
   let candles;
   let summary = null;
+  let news: Awaited<ReturnType<typeof getAssetNews>> = [];
   try {
-    [quote, candles, summary] = await Promise.all([
+    [quote, candles, summary, news] = await Promise.all([
       getQuote(decoded),
       getHistory(decoded, "1y"),
       getAssetSummary(decoded).catch(() => null),
+      getAssetNews(decoded).catch(() => []),
     ]);
   } catch {
     notFound();
@@ -129,6 +133,13 @@ export default async function AtivoPage({
               <AssetSummaryPanel summary={summary} />
             </SectionCard>
           )}
+
+          <SectionCard
+            title="Notícias"
+            subtitle="Manchetes recentes sobre o ativo"
+          >
+            <NewsPanel items={news} />
+          </SectionCard>
         </div>
 
         <div>
