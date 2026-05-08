@@ -344,3 +344,43 @@ select conname from pg_constraint where conname='holdings_indexer_check';
 
 Se as 3 saídas baterem, 0003 está aplicada — o erro era só o
 `asset_class_check` desatualizado, fixado pela 0004.
+
+### US Treasury "Não foi possível carregar dados" (maio/2026)
+
+- **Sintoma:** card "Estados Unidos" da página `/mercado/renda-fixa`
+  mostra a mensagem em vermelho de empty state. BCB (BR) carrega normal,
+  só o EUA falha.
+- **Causa raiz provável:** `api.fiscaldata.treasury.gov` às vezes
+  responde 403 para fetches do runtime serverless da Vercel quando o
+  request não tem `User-Agent`. Sem captura de erro, o usuário
+  via UI vazia.
+- **Fix em `lib/market/rates.ts`:**
+  1. Adiciona header `User-Agent: finance-app (...)` + `Accept: application/json`.
+  2. Troca `cache: "no-store"` por `next: { revalidate: 1800 }` (alinhado
+     com o TTL local de 30min).
+  3. Captura erros via `Sentry.captureException` com tag
+     `area=rates,source=US-Treasury` para parar de "perder" silenciosamente.
+  4. Adiciona fallback **Yahoo Finance**: `^IRX` (3M), `^FVX` (5Y),
+     `^TNX` (10Y), `^TYX` (30Y). Quando o Treasury devolve menos de 3
+     yields, completa com Yahoo. Resultado: a UI sempre mostra ao menos
+     4 yields enquanto Yahoo funcionar.
+- **Códigos do catálogo:** `ust_1m` foi removido (Yahoo não tem ticker
+  equivalente fácil); o catálogo agora é `ust_3m / ust_1y / ust_5y /
+  ust_10y / ust_30y`. Atualizar `RATE_GLOSSARY` e `defaultMaturityForCode`
+  na página `/mercado/renda-fixa`.
+
+### Tracking de migrations (maio/2026)
+
+- **Problema:** as migrations 0001-0004 foram aplicadas manualmente via
+  SQL Editor sem deixar rastro — não dava para responder "essa migration
+  já está em prod?" sem inspecionar tabelas/funções uma a uma.
+- **Fix:** migration `0005_schema_migrations.sql` cria
+  `public._migrations(version text primary key, applied_at timestamptz,
+  notes text)` e seeda 0001-0005 com `on conflict do nothing`. Cada
+  migration nova daqui pra frente termina com um `insert into
+  _migrations(version, notes) values (..., ...) on conflict do nothing`.
+- **Bootstrap:** rodar 0005 num banco onde 0001-0004 já existem é seguro
+  (a parte DDL é só `create table if not exists`).
+- **Workflow alternativo (futuro):** o `supabase` CLI gerencia isso via
+  `supabase_migrations.schema_migrations`, mas exige Docker. Coexiste com
+  o nosso `_migrations` se decidirmos migrar.
