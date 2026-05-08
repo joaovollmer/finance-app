@@ -277,17 +277,31 @@ Sprint A+B caíram em `main`.
 
 ### Sentry capturando 0 erros mesmo com DSN configurado
 
-- **Causa raiz:** `supabase.rpc()` devolve `{ error }` como **valor**, não
-  faz `throw`. A instrumentação automática do `@sentry/nextjs` só captura
-  exceções não tratadas — então erros de RPC (constraint, permissão,
-  network) sumiam sem aparecer no Sentry.
+- **Causa raiz #1 (instrumentation.ts ausente):** `@sentry/nextjs` v8+
+  com Next 14 exige um arquivo `instrumentation.ts` na raiz do projeto
+  para que `sentry.server.config.ts` e `sentry.edge.config.ts` sejam
+  carregados no runtime certo. Sem ele, **o SDK do servidor nunca
+  inicializa** — Server Components, route handlers, cron e qualquer
+  exceção do Node ficam invisíveis. O sintoma é exatamente o que o
+  usuário viu: aba "Issues > Feed" do Sentry mostrando o onboarding
+  ("Get Started with Sentry Issues") em vez de eventos. Fix:
+  `instrumentation.ts` que faz `await import("./sentry.server.config")`
+  para `nodejs` e `./sentry.edge.config` para `edge`, mais
+  `export const onRequestError = Sentry.captureRequestError`.
+- **Causa raiz #2 (RPC do Supabase devolve erro como valor):** mesmo com
+  o SDK ativo, `supabase.rpc()` não faz `throw`. A instrumentação
+  automática só captura exceções não tratadas, então erros de RPC
+  (constraint, permissão, network) sumiam sem aparecer no Sentry.
 - **Fix:** chamada explícita `Sentry.captureException(error, { tags, extra })`
   nos blocos `if (error) { … }` de `OrderForm.tsx` e `BondOrderForm.tsx`,
   com tag `area=stock_order|bond_order` e `extra` com ticker / asset_class.
-- **Como validar o wiring:** rodar a app com DSN setado e tentar comprar RF
-  *antes* de aplicar a migration 0004 — o erro de constraint já cai no
-  Sentry. Outra forma: criar um endpoint debug que chama
-  `throw new Error("sentry-test")` e abrir uma vez.
+- **Smoke test:** rota `app/api/_sentry-check/route.ts` lança um erro
+  quando chamada com `?secret=<CRON_SECRET>`. Útil para validar o
+  wiring sem depender de erro real da app. Não esquecer de remover ou
+  proteger antes de release público.
+- **Como validar o wiring na Vercel:** `curl -i
+  https://<deploy>/api/_sentry-check?secret=<CRON_SECRET>` →
+  HTTP 500 + evento aparecendo em Sentry > Issues > Feed em ~10s.
 - **Lição arquitetural:** sempre que adotarmos um novo client que não
   faz throw (Supabase, fetch sem `res.ok` check, etc.), instrumentar o
   caminho de erro manualmente.
