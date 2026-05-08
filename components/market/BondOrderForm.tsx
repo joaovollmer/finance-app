@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { FixedIncomeIndexer } from "@/lib/market/types";
 
@@ -113,6 +114,17 @@ export default function BondOrderForm({
     setLoading(false);
 
     if (error) {
+      // Supabase devolve erro como valor (não throw), então capturamos
+      // explicitamente para o Sentry — caso contrário, falhas em RPC
+      // (ex.: violação de constraint) ficariam invisíveis no monitoramento.
+      Sentry.captureException(error, {
+        tags: { area: "bond_order", rpc: "execute_fixed_income_buy" },
+        extra: {
+          ticker,
+          asset_class: selected.assetClass,
+          indexer: selected.indexer,
+        },
+      });
       setError(error.message);
       return;
     }
@@ -156,7 +168,8 @@ export default function BondOrderForm({
         <input
           type="number"
           min={1}
-          step={50}
+          step="any"
+          inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
           className="w-full rounded-xl border-[1.5px] border-surface-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"

@@ -238,10 +238,95 @@ Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
 
 ## Pendências subsequentes (Sprint B+)
 
-- [ ] Rate limiting `/api/*` (Upstash Ratelimit, fallback in-memory).
-- [ ] Sentry SDK com DSN opcional via env.
-- [ ] Vitest + Playwright + GitHub Actions CI.
+- [x] Rate limiting `/api/*` (Upstash Ratelimit, fallback in-memory) — Sprint B.
+- [x] Sentry SDK com DSN opcional via env — Sprint B.
+- [ ] Vitest + Playwright + GitHub Actions CI — **Sprint C** (próxima branch
+  `claude/v1.1-tests-sprint-c`).
 - [ ] Páginas legais (`/privacidade`, `/termos`) + footer + banner de
-  simulação educacional.
+  simulação educacional — **Sprint D**.
 - [ ] Decidir host do microserviço de predição (Railway / Fly / Supabase Edge).
 - [ ] Avaliar caching distribuído (Upstash Redis) para cotações.
+
+## Hotfix v1.1 — pós-merge main (maio/2026)
+
+Branch: `claude/v1.1-hotfix-env-readme`. Corrige bugs descobertos depois que
+Sprint A+B caíram em `main`.
+
+### Erro `holdings_asset_class_check` na compra de renda fixa
+
+- **Sintoma:** `BondOrderForm` mostra "new row for relation 'holdings'
+  violates check constraint 'holdings_asset_class_check'" ao confirmar
+  aplicação.
+- **Causa raiz:** migration `0001_init.sql` define
+  `check (asset_class in ('stock_br','stock_us'))` em `holdings` e
+  `transactions`. Migration `0003_fixed_income.sql` adicionou as RPCs com
+  `bond_br`/`bond_us` mas esqueceu de ampliar o check.
+- **Fix:** migration `0004_bond_asset_class.sql` faz `drop constraint if
+  exists` e recria com o universo `('stock_br','stock_us','bond_br','bond_us')`
+  nas duas tabelas. Idempotente. **Precisa rodar no Supabase prod.**
+
+### Input numérico do BondOrderForm rejeitando valores redondos
+
+- **Sintoma:** ao digitar 10000 / 80000 / 100000 no "Valor a investir", o
+  browser bloqueia com "Insira um valor válido. Os dois valores válidos
+  mais próximos são 9951 e 10001".
+- **Causa raiz:** o `<input type="number">` tinha `min={1}` + `step={50}`,
+  então a malha de valores válidos era 1, 51, 101, …, 9951, 10001 (offset
+  de 1). 10000 fica fora dessa grade e o HTML5 valida no envio.
+- **Fix:** `step="any"` + `inputMode="decimal"`. Mantém `min={1}`.
+
+### Sentry capturando 0 erros mesmo com DSN configurado
+
+- **Causa raiz:** `supabase.rpc()` devolve `{ error }` como **valor**, não
+  faz `throw`. A instrumentação automática do `@sentry/nextjs` só captura
+  exceções não tratadas — então erros de RPC (constraint, permissão,
+  network) sumiam sem aparecer no Sentry.
+- **Fix:** chamada explícita `Sentry.captureException(error, { tags, extra })`
+  nos blocos `if (error) { … }` de `OrderForm.tsx` e `BondOrderForm.tsx`,
+  com tag `area=stock_order|bond_order` e `extra` com ticker / asset_class.
+- **Como validar o wiring:** rodar a app com DSN setado e tentar comprar RF
+  *antes* de aplicar a migration 0004 — o erro de constraint já cai no
+  Sentry. Outra forma: criar um endpoint debug que chama
+  `throw new Error("sentry-test")` e abrir uma vez.
+- **Lição arquitetural:** sempre que adotarmos um novo client que não
+  faz throw (Supabase, fetch sem `res.ok` check, etc.), instrumentar o
+  caminho de erro manualmente.
+
+### `.env.example` — chaves reais residuais
+
+- O commit `70f54b9` ("substitui chaves reais por placeholders") só
+  *acrescentou* um bloco de placeholders ao final do arquivo, mantendo as
+  JWT reais nas linhas 2-4. O hotfix reescreve o arquivo inteiro com
+  apenas placeholders, na ordem: Supabase → CRON_SECRET → Upstash → Sentry.
+- **Ação necessária no operador:** rotacionar a `service_role` (e idealmente
+  a `anon`) já que estiveram públicas. No painel novo:
+  *Project Settings → API Keys → "Publishable and secret API keys"* →
+  "Create new secret key" / "Disable" no antigo.
+  Para o esquema legado (aba mostrada na imagem do usuário):
+  *Settings → JWT Keys → "Roll JWT Secret"* — invalida `anon` e
+  `service_role` em massa, e novas chaves são geradas.
+
+### Como validar a migration 0003 no Supabase
+
+Rodar no SQL editor do Supabase:
+
+```sql
+-- Colunas da migration 0003 existem em holdings?
+select column_name from information_schema.columns
+ where table_schema='public' and table_name='holdings'
+   and column_name in ('indexer','index_percent','fixed_rate',
+                       'purchase_date','maturity_date','principal');
+-- Esperado: 6 linhas.
+
+-- A RPC existe?
+select proname from pg_proc
+ where proname = 'execute_fixed_income_buy';
+-- Esperado: 1 linha.
+
+-- Constraint do indexer presente?
+select conname from pg_constraint where conname='holdings_indexer_check';
+-- Esperado: 1 linha.
+```
+
+Se as 3 saídas baterem, 0003 está aplicada — o erro era só o
+`asset_class_check` desatualizado, fixado pela 0004.
