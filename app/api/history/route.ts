@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getHistory } from "@/lib/market/yahoo";
+import { withRateLimit } from "@/lib/api/with-rate-limit";
 
 const QuerySchema = z.object({
   ticker: z.string().min(1).max(20),
   range: z.enum(["1mo", "3mo", "6mo", "1y", "2y", "5y"]).default("1y"),
 });
 
-export async function GET(request: Request) {
+export const GET = withRateLimit(async (request: Request) => {
   const { searchParams } = new URL(request.url);
   const parsed = QuerySchema.safeParse({
     ticker: searchParams.get("ticker"),
@@ -31,4 +32,4 @@ export async function GET(request: Request) {
       { status: 404 }
     );
   }
-}
+});
