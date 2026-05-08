@@ -67,15 +67,17 @@ supabase/migrations/
   0001_init.sql                     # schema + RLS + RPC execute_order
   0002_fx_cash_amount.sql           # cash_amount + execute_order com câmbio
   0003_fixed_income.sql             # holdings RF + execute_fixed_income_buy
+  0004_bond_asset_class.sql         # amplia asset_class_check para bond_*
+  0005_schema_migrations.sql        # tabela _migrations + histórico
+instrumentation.ts                  # carrega Sentry server/edge config
+sentry.{client,server,edge}.config.ts
 ```
 
 ## Setup local
 
 1. Crie um projeto no [Supabase](https://app.supabase.com) e aplique as
-   migrations em ordem (SQL Editor → New Query):
-   - `supabase/migrations/0001_init.sql`
-   - `supabase/migrations/0002_fx_cash_amount.sql`
-   - `supabase/migrations/0003_fixed_income.sql`
+   migrations em ordem (SQL Editor → New Query) — ver
+   [Runbook de migrations](#runbook-de-migrations) abaixo.
 2. Em **Authentication → Providers**, habilite "Email" com senha.
 3. Copie URL e `anon` key para `.env.local`:
 
@@ -94,7 +96,7 @@ npm run dev
 Acesse `http://localhost:3000`. Crie uma conta, defina o saldo inicial e
 comece a operar.
 
-## Observabilidade e proteção (v1.1 — Sprint B)
+## Observabilidade e proteção (v1.1 — Sprints B + hotfix)
 
 Os endpoints `/api/*` (exceto cron) passam por um rate limiter por IP:
 
@@ -104,14 +106,36 @@ Os endpoints `/api/*` (exceto cron) passam por um rate limiter por IP:
 - **Sem Upstash:** fallback in-memory por instância serverless. OK em dev,
   fraco em prod (cada instância da Vercel mantém seu próprio contador).
 
-Sentry é instalado mas só ativa quando o DSN existe:
+Sentry só ativa quando o DSN existe:
 
-- `NEXT_PUBLIC_SENTRY_DSN` (obrigatório pra captura no client)
-- `SENTRY_DSN` (server, geralmente o mesmo)
+- `NEXT_PUBLIC_SENTRY_DSN` (captura no client)
+- `SENTRY_DSN` (server, geralmente o mesmo valor)
 - `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` (opcionais — só pra
-  upload de sourcemaps na build)
+  upload de sourcemaps no build)
 
-Sem essas vars, o SDK é no-op e a build prossegue normalmente.
+Sem DSN, o SDK fica no-op e o build prossegue normalmente.
+
+**`instrumentation.ts` é obrigatório.** Sem ele, o `@sentry/nextjs` v8+
+não inicializa o SDK do servidor em Next 14 — Server Components e
+route handlers não enviam eventos. O arquivo na raiz importa
+`sentry.server.config.ts` e `sentry.edge.config.ts` no runtime certo
+e expõe `onRequestError` para Server Components do App Router.
+
+**Erros do Supabase precisam ser capturados manualmente.** A função
+`supabase.rpc()` devolve `{ error }` como valor, sem `throw`. A
+instrumentação automática não pega esses erros, então `OrderForm` e
+`BondOrderForm` chamam `Sentry.captureException(error, …)` no bloco de
+erro.
+
+**Smoke test do Sentry:**
+
+```bash
+curl -i "https://<deploy>/api/_sentry-check?secret=$CRON_SECRET"
+```
+
+Devolve HTTP 500 e o evento aparece em **Sentry > Issues > Feed** em ~10s.
+Sem o `?secret=`, o endpoint retorna 401 e não dispara nada — pode
+ficar em produção como verificação on-demand.
 ## Deploy na Vercel
 
 1. **Crie um projeto** em [vercel.com/new](https://vercel.com/new) e conecte
@@ -126,10 +150,59 @@ Sem essas vars, o SDK é no-op e a build prossegue normalmente.
 3. **Cron diário:** o `vercel.json` na raiz já configura
    `/api/cron/snapshot` rodando às 03:00 UTC todo dia. A primeira execução
    acontece automaticamente após o primeiro deploy bem-sucedido.
-4. **Aplicar migrations no Supabase prod** (SQL Editor → New Query) na
-   ordem: `0001_init.sql`, `0002_fx_cash_amount.sql`, `0003_fixed_income.sql`.
+4. **Aplicar migrations no Supabase prod** seguindo o
+   [Runbook de migrations](#runbook-de-migrations) — ordem importa.
 5. Apertar **Deploy**. As builds subsequentes em `main` viram preview/prod
    automáticos.
+
+### Runbook de migrations
+
+As migrations vivem em `supabase/migrations/NNNN_<slug>.sql`, numeradas
+em ordem cronológica. Cada arquivo é idempotente onde possível e termina
+com um insert em `public._migrations` para deixar o histórico salvo no
+banco.
+
+**Para aplicar uma migration nova:**
+
+1. Abra **SQL Editor → New Query** no Supabase.
+2. Cole o conteúdo do `.sql` na ordem.
+3. **Antes de rodar**, confirme o que já está aplicado:
+
+   ```sql
+   select version, applied_at from public._migrations
+    order by version;
+   ```
+
+4. Rode `Run`. O `insert into _migrations` no fim do arquivo registra
+   a aplicação. Se a migration já estava aplicada, o `on conflict do
+   nothing` evita duplicidade — só não rode a parte de DDL duas vezes.
+5. **Não apague** o conteúdo do editor logo após rodar; deixe pelo
+   menos a query de verificação visível para conferir o resultado.
+
+**Bootstrap em um banco já em uso (que rodou 0001-0004 sem rastro):**
+
+1. Aplique apenas `0005_schema_migrations.sql`. O insert dele já
+   marca 0001-0005 como aplicadas, alinhando o registro com a
+   realidade do banco.
+2. Rode a query de verificação acima — deve listar 5 versões.
+
+**Para uma nova migration sua:**
+
+1. Crie `supabase/migrations/00NN_<slug>.sql` com o próximo número.
+2. Termine o arquivo com:
+
+   ```sql
+   insert into public._migrations(version, notes) values
+     ('00NN_<slug>', '<descrição curta>')
+   on conflict (version) do nothing;
+   ```
+
+3. Aplique seguindo o passo a passo anterior.
+
+> **Por que não o `supabase` CLI?** Ele faz isso de forma automática via
+> `supabase db push`, mas exige Docker no fluxo local — overkill para um
+> projeto pequeno. A tabela `public._migrations` é compatível e dá pra
+> migrar pro CLI depois sem perder o histórico.
 
 ### Testando o cron localmente
 
@@ -146,15 +219,40 @@ A versão 1.0 fecha o MVP com renda variável + renda fixa simulada. As próxima
 fases priorizam **lançar para teste de público**, aprofundar a análise
 fundamentalista, ampliar fontes de dados e adicionar predição de preços.
 
-### Fase 1.1 — Lançamento público (semanas 1–2)
+### Fase 1.1 — Lançamento público (em andamento)
 
-- Hospedar em Vercel + Supabase prod, configurar domínio e variáveis.
-- Logging/monitoramento (Vercel Analytics + Sentry).
-- Rate limiting nos endpoints `/api/*` e cache de cotações.
-- Política de privacidade, termos e LGPD básica.
-- Snapshot diário da carteira via cron (Vercel Cron) substituindo upsert no
-  acesso.
-- Smoke tests (Vitest + Playwright) cobrindo fluxos críticos.
+Dividida em sprints, cada uma virando uma branch
+`claude/v1.1-<tema>-sprint-<id>`:
+
+- **Sprint A — Deploy + Cron + Analytics** ✅
+  - `vercel.json` configurando cron diário 03:00 UTC em `/api/cron/snapshot`.
+  - Rota cron protegida por `CRON_SECRET`, usa `service_role` para
+    bypass de RLS e itera todos os portfolios.
+  - Lógica de valuation extraída para `lib/portfolio/total_value.ts`.
+  - Vercel Analytics integrado.
+- **Sprint B — Rate limit + Sentry** ✅
+  - `lib/ratelimit.ts` com Upstash Redis (slidingWindow 60req/60s) e
+    fallback in-memory aplicado nas 4 rotas `/api/*`.
+  - Sentry SDK opcional via DSN nas envs.
+- **Hotfix pós-merge** ✅
+  - Migration `0004` corrigindo `holdings_asset_class_check` para aceitar
+    `bond_br/bond_us`.
+  - `BondOrderForm` com `step="any"` (resolve bug do step=50).
+  - `instrumentation.ts` (faltava — Sentry não inicializava no servidor).
+  - `Sentry.captureException` explícito em `OrderForm`/`BondOrderForm`
+    para erros de RPC do Supabase.
+  - `.env.example` reescrito com placeholders puros.
+  - US Treasury com fallback Yahoo (`^IRX/^FVX/^TNX/^TYX`) para quando
+    o `fiscaldata.treasury.gov` falhar.
+  - Migration `0005` introduzindo `public._migrations` para rastreio.
+- **Sprint C — Testes + CI** (próximo)
+  - Vitest cobrindo `lib/portfolio/*` e `lib/market/{bcb,rates}.ts`.
+  - Playwright nos fluxos críticos (auth → onboarding → compra).
+  - GitHub Actions rodando lint + typecheck + unit em cada PR.
+- **Sprint D — Páginas legais + LGPD básica**
+  - `/privacidade`, `/termos`, footer com links.
+  - Banner global "Simulação educacional — não é recomendação financeira".
+  - Cookie/local-storage notice mínimo.
 
 ### Fase 1.2 — Onboarding flexível e fundamentos (semanas 2–4)
 
