@@ -33,6 +33,10 @@ A linguagem é acessível ao leigo, mas os dados têm profundidade para o avanç
   gráfico de evolução com snapshot diário.
 - **Notícias por ativo** (v1.2 — Sprint C): manchetes recentes via Yahoo
   Finance com fallback para Google News RSS, exibidas no detalhe do ativo.
+- **Onboarding flexível** (v1.2 — Sprint A): saldo inicial deixou de ser
+  obrigatório. No modo deposit-on-buy a carteira começa zerada e cada
+  compra incrementa o `total_deposited`; o dashboard mostra "Total
+  aportado" × "Valorização" em vez de "Saldo em caixa" × "Resultado".
 - **Design system "O Investidor"** (Plus Jakarta Sans, tokens pastéis,
   SectionCard/StatCard/Badge, InfoTooltip com glossário).
 - **Build de produção verde** (`npm run build`).
@@ -72,6 +76,7 @@ supabase/migrations/
   0004_bond_asset_class.sql         # amplia asset_class_check para bond_*
   0005_schema_migrations.sql        # tabela _migrations + histórico
   0006_migrations_rls.sql           # RLS em _migrations (nega acesso anon)
+  0007_deposit_on_buy.sql           # portfolios.deposit_mode + total_deposited + RPCs adaptadas
 instrumentation.ts                  # carrega Sentry server/edge config
 sentry.{client,server,edge}.config.ts
 ```
@@ -279,10 +284,11 @@ Dividida em sprints, cada uma virando uma branch
 
 ### Fase 1.2 — Onboarding flexível e fundamentos (semanas 2–4)
 
-- Onboarding opcional: saldo inicial deixa de ser obrigatório. Sem saldo
-  definido, cada compra **incrementa** o patrimônio (modo "deposit-on-buy")
-  e a carteira mostra aporte total + valorização separados.
-- Aprofundamento fundamentalista por ativo:
+- Onboarding opcional ✅ (Sprint A): saldo inicial deixou de ser obrigatório.
+  No modo deposit-on-buy a carteira começa zerada, cada compra incrementa
+  `total_deposited` e o dashboard separa "Total aportado" × "Valorização"
+  (ver migration `0007_deposit_on_buy.sql`).
+- Aprofundamento fundamentalista por ativo (Sprint B — pendente):
   - DRE e balanço resumidos (Yahoo `incomeStatementHistory`,
     `balanceSheetHistory`, `cashflowStatementHistory`).
   - Múltiplos históricos (P/L, P/VP, EV/EBITDA), payout, dívida líquida/EBITDA.

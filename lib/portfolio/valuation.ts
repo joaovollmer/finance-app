@@ -23,6 +23,8 @@ export interface PortfolioRow {
   cash_balance: number;
   currency: string;
   created_at: string;
+  deposit_mode?: boolean;
+  total_deposited?: number;
 }
 
 export function formatCurrency(value: number, currency = "BRL"): string {
@@ -48,4 +50,32 @@ export function pnl(
   const absolute = market - cost;
   const percent = cost > 0 ? (absolute / cost) * 100 : 0;
   return { absolute, percent };
+}
+
+// Baseline para o cálculo de P&L do dashboard. Em modo padrão usamos o saldo
+// inicial; em deposit-on-buy usamos o total aportado (que cresce a cada
+// compra que precisa de aporte novo). Quando o aporte é zero (carteira
+// recém-criada em modo deposit), o percentual é 0 — o card mostra a
+// orientação para a primeira compra.
+export function portfolioBaseline(
+  portfolio: Pick<
+    PortfolioRow,
+    "initial_cash" | "deposit_mode" | "total_deposited"
+  >
+): number {
+  if (portfolio.deposit_mode) return Number(portfolio.total_deposited ?? 0);
+  return Number(portfolio.initial_cash);
+}
+
+export function portfolioPnL(
+  portfolio: Pick<
+    PortfolioRow,
+    "initial_cash" | "deposit_mode" | "total_deposited"
+  >,
+  totalValue: number
+): { baseline: number; absolute: number; percent: number } {
+  const baseline = portfolioBaseline(portfolio);
+  const absolute = totalValue - baseline;
+  const percent = baseline > 0 ? (absolute / baseline) * 100 : 0;
+  return { baseline, absolute, percent };
 }

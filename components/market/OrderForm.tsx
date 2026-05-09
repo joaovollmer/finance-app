@@ -18,6 +18,7 @@ interface Props {
   ownedQuantity: number;
   fxRate?: number;
   fxDate?: string;
+  depositMode?: boolean;
 }
 
 export default function OrderForm({
@@ -31,6 +32,7 @@ export default function OrderForm({
   ownedQuantity,
   fxRate,
   fxDate,
+  depositMode = false,
 }: Props) {
   const router = useRouter();
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -59,7 +61,7 @@ export default function OrderForm({
       setError("Câmbio indisponível para esta operação.");
       return;
     }
-    if (side === "buy" && cashAmount > cashBalance) {
+    if (side === "buy" && !depositMode && cashAmount > cashBalance) {
       setError("Saldo insuficiente para essa compra.");
       return;
     }
@@ -183,6 +185,16 @@ export default function OrderForm({
           value={formatCurrency(cashBalance, portfolioCurrency)}
           hint
         />
+        {depositMode && side === "buy" && cashAmount > cashBalance && (
+          <Row
+            label="Novo aporte necessário"
+            value={formatCurrency(
+              Math.max(0, cashAmount - cashBalance),
+              portfolioCurrency
+            )}
+            hint
+          />
+        )}
         {ownedQuantity > 0 && (
           <Row label="Posição atual" value={`${ownedQuantity} unid.`} hint />
         )}

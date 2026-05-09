@@ -224,6 +224,53 @@ Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
    RFR/XGBoost/LSTM e SHAP.
 6. **Qualidade contínua (v1.6):** cache, RSC streaming, acessibilidade.
 
+## v1.2 — Sprint A (onboarding flexível / deposit-on-buy) — maio/2026
+
+Branch: `claude/v1.2-onboarding-flex-sprint-a`. Saldo inicial deixou de ser
+obrigatório; quem escolhe o modo "Sob demanda" começa com carteira zerada
+e cada compra incrementa o aporte.
+
+- **Migration `0007_deposit_on_buy.sql`:** adiciona `portfolios.deposit_mode`
+  (boolean, default false) e `portfolios.total_deposited` (numeric, default
+  0). Backfill: para portfolios pré-existentes, `total_deposited =
+  initial_cash` (idempotente — só atualiza onde está zerado).
+- **RPC `execute_order` adaptada:** quando `deposit_mode=true`, o branch
+  de compra consome `cash_balance` disponível primeiro (vendas anteriores)
+  e o restante vira aporte novo (`total_deposited += diferença`). Nunca
+  falha por "saldo insuficiente". Vendas creditam `cash_balance` em ambos
+  modos. Comportamento do modo padrão preservado integralmente.
+- **RPC `execute_fixed_income_buy` adaptada:** mesma lógica do
+  `execute_order` para deposit_mode. Sem mudança de assinatura.
+- **`portfolioBaseline` e `portfolioPnL` (`lib/portfolio/valuation.ts`):**
+  funções puras que devolvem `initial_cash` (modo padrão) ou
+  `total_deposited` (deposit_mode) como base do P&L do dashboard. Quando
+  o aporte é zero, percentual é 0 (carteira recém-criada não mostra "0%
+  desde o início" e sim "Faça sua primeira compra").
+- **Onboarding (`app/(app)/onboarding/page.tsx`):** dois cards de modo —
+  "Saldo inicial" (valor + presets, comportamento atual) e "Sob demanda"
+  (insere portfolio com `initial_cash=0`, `cash_balance=0`,
+  `deposit_mode=true`).
+- **Forms:** `OrderForm` e `BondOrderForm` recebem `depositMode` (default
+  false). Em deposit_mode, removem a checagem client-side de "saldo
+  insuficiente" e mostram um row "Novo aporte necessário" com a diferença
+  entre `cash_amount` e `cash_balance` quando relevante. Páginas
+  `/ativo/[ticker]` e `/mercado/renda-fixa` passam `portfolio.deposit_mode
+  === true` adiante.
+- **Dashboard `/carteira`:** em `deposit_mode`, o segundo card vira "Total
+  Aportado" e o terceiro "Valorização" (sufixo "sobre o aporte"). Série
+  do gráfico começa em 0 em vez de `initial_cash` para refletir o aporte
+  zero inicial. Modo padrão inalterado.
+- **Tipos:** `PortfolioRow` ganha `deposit_mode?: boolean` e
+  `total_deposited?: number` opcionais (compatível com queries que
+  selecionam `*` independentemente de a migration estar aplicada).
+- **Testes:** 6 novos casos em `__tests__/portfolio/valuation.test.ts`
+  cobrindo `portfolioBaseline` (3 cenários) e `portfolioPnL` (3 cenários).
+  Build verde, 34 testes no total.
+- **Operacional:** migration `0007` precisa rodar no Supabase prod antes
+  do deploy desta sprint, ou todas as queries em `portfolios` falham por
+  coluna inexistente. Conferir via `select version from public._migrations
+  where version='0007_deposit_on_buy'`.
+
 ## v1.2 — Sprint C (notícias por ativo) — maio/2026
 
 Branch: `claude/v1.2-news-sprint-c`. Primeiro entregável da v1.2 (warm-up
