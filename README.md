@@ -37,6 +37,11 @@ A linguagem é acessível ao leigo, mas os dados têm profundidade para o avanç
   obrigatório. No modo deposit-on-buy a carteira começa zerada e cada
   compra incrementa o `total_deposited`; o dashboard mostra "Total
   aportado" × "Valorização" em vez de "Saldo em caixa" × "Resultado".
+- **Fundamentalismo profundo** (v1.2 — Sprint B): no detalhe do ativo,
+  novo painel com tabs de Resultado / Balanço / Caixa / Múltiplos /
+  Recomendações (via `quoteSummary` expandido) + comparação setorial
+  com peers curados. InfoTooltip redesenhado: posicionamento dinâmico
+  (top/bottom), tipografia normal forçada, dispensa em Esc/clique fora.
 - **Design system "O Investidor"** (Plus Jakarta Sans, tokens pastéis,
   SectionCard/StatCard/Badge, InfoTooltip com glossário).
 - **Build de produção verde** (`npm run build`).
@@ -62,12 +67,12 @@ app/
     ativo/[ticker]/                 # detalhe + gráfico + OrderForm
   api/{quote,history,search,fx,news}/ # endpoints sobre os providers
 lib/
-  market/{yahoo,bcb,rates,news,types}.ts
+  market/{yahoo,bcb,rates,news,peers,types}.ts
   portfolio/{valuation,fixed_income}.ts
 components/
   auth/{AuthShell,LogoutButton}.tsx
   charts/PortfolioChart.tsx
-  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,NewsPanel}.tsx
+  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,FundamentalsPanel,PeersPanel,NewsPanel}.tsx
   ui/{Card,InfoTooltip,LogoMark,NavLink}.tsx
 supabase/migrations/
   0001_init.sql                     # schema + RLS + RPC execute_order
@@ -298,7 +303,7 @@ Dividida em sprints, cada uma virando uma branch
   No modo deposit-on-buy a carteira começa zerada, cada compra incrementa
   `total_deposited` e o dashboard separa "Total aportado" × "Valorização"
   (ver migration `0007_deposit_on_buy.sql`).
-- Aprofundamento fundamentalista por ativo (Sprint B — pendente):
+- Aprofundamento fundamentalista por ativo ✅ (Sprint B):
   - DRE e balanço resumidos (Yahoo `incomeStatementHistory`,
     `balanceSheetHistory`, `cashflowStatementHistory`).
   - Múltiplos históricos (P/L, P/VP, EV/EBITDA), payout, dívida líquida/EBITDA.

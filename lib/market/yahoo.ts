@@ -1,11 +1,18 @@
 import yfDefault from "yahoo-finance2";
 import type {
   AssetClass,
+  AssetFundamentals,
   AssetSearchResult,
   AssetSummary,
+  BalanceSheetYear,
   Candle,
+  CashflowYear,
   HistoryRange,
+  IncomeStatementYear,
+  PeerQuote,
   Quote,
+  RecommendationTrend,
+  UpgradeDowngrade,
 } from "./types";
 
 // yahoo-finance2 v3 deixou de exportar uma instância pronta — agora a default
@@ -299,4 +306,285 @@ export async function getAssetSummary(input: string): Promise<AssetSummary> {
     returnOnEquity: num(fd.returnOnEquity),
     totalRevenue: num(fd.totalRevenue),
   };
+}
+
+// --- Fundamentos profundos (Sprint v1.2-B) -------------------------------
+// Estes módulos do quoteSummary não vêm para todo ticker — empresas
+// brasileiras geralmente só preenchem income/balance/cashflow anuais. Por
+// isso cada array pode vir vazio sem o caller quebrar.
+
+type RawStatementRow = {
+  endDate?: number | Date | { raw?: number; fmt?: string };
+  totalRevenue?: number | { raw?: number };
+  grossProfit?: number | { raw?: number };
+  operatingIncome?: number | { raw?: number };
+  ebitda?: number | { raw?: number };
+  netIncome?: number | { raw?: number };
+};
+
+type RawBalanceRow = {
+  endDate?: number | Date | { raw?: number; fmt?: string };
+  totalAssets?: number | { raw?: number };
+  totalLiab?: number | { raw?: number };
+  totalStockholderEquity?: number | { raw?: number };
+  cash?: number | { raw?: number };
+  shortLongTermDebt?: number | { raw?: number };
+  longTermDebt?: number | { raw?: number };
+};
+
+type RawCashflowRow = {
+  endDate?: number | Date | { raw?: number; fmt?: string };
+  totalCashFromOperatingActivities?: number | { raw?: number };
+  capitalExpenditures?: number | { raw?: number };
+  dividendsPaid?: number | { raw?: number };
+};
+
+type RawRecommendationRow = {
+  period?: string;
+  strongBuy?: number;
+  buy?: number;
+  hold?: number;
+  sell?: number;
+  strongSell?: number;
+};
+
+type RawUpgradeRow = {
+  epochGradeDate?: number | Date | { raw?: number };
+  firm?: string;
+  fromGrade?: string;
+  toGrade?: string;
+  action?: string;
+};
+
+type RawFundamentals = {
+  price?: { marketCap?: number | { raw?: number } };
+  incomeStatementHistory?: { incomeStatementHistory?: RawStatementRow[] };
+  balanceSheetHistory?: { balanceSheetStatements?: RawBalanceRow[] };
+  cashflowStatementHistory?: { cashflowStatements?: RawCashflowRow[] };
+  recommendationTrend?: { trend?: RawRecommendationRow[] };
+  upgradeDowngradeHistory?: { history?: RawUpgradeRow[] };
+};
+
+function dateString(
+  v: number | Date | { raw?: number; fmt?: string } | undefined
+): string {
+  if (!v) return "";
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === "number") return new Date(v * 1000).toISOString().slice(0, 10);
+  if (typeof v === "object") {
+    if (typeof v.fmt === "string") return v.fmt;
+    if (typeof v.raw === "number")
+      return new Date(v.raw * 1000).toISOString().slice(0, 10);
+  }
+  return "";
+}
+
+const fundamentalsCache = new Map<
+  string,
+  { value: AssetFundamentals; fetchedAt: number }
+>();
+const FUND_TTL = 60 * 60 * 1000;
+
+export async function getAssetFundamentals(
+  input: string
+): Promise<AssetFundamentals> {
+  const { yahooSymbol } = normalizeTicker(input);
+  const now = Date.now();
+  const cached = fundamentalsCache.get(yahooSymbol);
+  if (cached && now - cached.fetchedAt < FUND_TTL) return cached.value;
+
+  const raw = (await yahooFinance.quoteSummary(yahooSymbol, {
+    modules: [
+      "price",
+      "incomeStatementHistory",
+      "balanceSheetHistory",
+      "cashflowStatementHistory",
+      "recommendationTrend",
+      "upgradeDowngradeHistory",
+    ],
+  })) as RawFundamentals;
+
+  const income: IncomeStatementYear[] = (
+    raw.incomeStatementHistory?.incomeStatementHistory ?? []
+  ).map((r) => ({
+    endDate: dateString(r.endDate),
+    totalRevenue: num(r.totalRevenue),
+    grossProfit: num(r.grossProfit),
+    operatingIncome: num(r.operatingIncome),
+    ebitda: num(r.ebitda),
+    netIncome: num(r.netIncome),
+  }));
+
+  const balance: BalanceSheetYear[] = (
+    raw.balanceSheetHistory?.balanceSheetStatements ?? []
+  ).map((r) => {
+    const short = num(r.shortLongTermDebt) ?? 0;
+    const long = num(r.longTermDebt) ?? 0;
+    const totalDebt = short + long > 0 ? short + long : undefined;
+    return {
+      endDate: dateString(r.endDate),
+      totalAssets: num(r.totalAssets),
+      totalLiabilities: num(r.totalLiab),
+      totalEquity: num(r.totalStockholderEquity),
+      totalCash: num(r.cash),
+      totalDebt,
+    };
+  });
+
+  const cashflow: CashflowYear[] = (
+    raw.cashflowStatementHistory?.cashflowStatements ?? []
+  ).map((r) => {
+    const op = num(r.totalCashFromOperatingActivities);
+    const capex = num(r.capitalExpenditures);
+    const fcf =
+      op !== undefined && capex !== undefined ? op + capex : undefined;
+    return {
+      endDate: dateString(r.endDate),
+      operatingCashflow: op,
+      capitalExpenditures: capex,
+      freeCashflow: fcf,
+      dividendsPaid: num(r.dividendsPaid),
+    };
+  });
+
+  const recommendations: RecommendationTrend[] = (
+    raw.recommendationTrend?.trend ?? []
+  ).map((r) => ({
+    period: r.period ?? "",
+    strongBuy: r.strongBuy ?? 0,
+    buy: r.buy ?? 0,
+    hold: r.hold ?? 0,
+    sell: r.sell ?? 0,
+    strongSell: r.strongSell ?? 0,
+  }));
+
+  const upgrades: UpgradeDowngrade[] = (
+    raw.upgradeDowngradeHistory?.history ?? []
+  )
+    .slice(0, 15)
+    .map((r) => ({
+      date: dateString(r.epochGradeDate),
+      firm: r.firm ?? "—",
+      fromGrade: r.fromGrade,
+      toGrade: r.toGrade,
+      action: r.action,
+    }));
+
+  const derived = deriveMultiples({
+    marketCap: num(raw.price?.marketCap),
+    latestIncome: income[0],
+    latestBalance: balance[0],
+    latestCashflow: cashflow[0],
+  });
+
+  const value: AssetFundamentals = {
+    income,
+    balance,
+    cashflow,
+    recommendations,
+    upgrades,
+    derived,
+  };
+  fundamentalsCache.set(yahooSymbol, { value, fetchedAt: now });
+  return value;
+}
+
+// Múltiplos derivados explícitos para o caller não recalcular. Mantemos
+// puro (sem leitura de API) para ficar testável.
+export function deriveMultiples(input: {
+  marketCap?: number;
+  latestIncome?: IncomeStatementYear;
+  latestBalance?: BalanceSheetYear;
+  latestCashflow?: CashflowYear;
+}): AssetFundamentals["derived"] {
+  const { marketCap, latestIncome, latestBalance, latestCashflow } = input;
+  const derived: AssetFundamentals["derived"] = {};
+
+  const ebitda = latestIncome?.ebitda;
+  const cash = latestBalance?.totalCash;
+  const debt = latestBalance?.totalDebt;
+
+  if (
+    marketCap !== undefined &&
+    ebitda !== undefined &&
+    ebitda !== 0
+  ) {
+    const ev = marketCap + (debt ?? 0) - (cash ?? 0);
+    derived.evEbitda = ev / ebitda;
+  }
+
+  if (
+    ebitda !== undefined &&
+    ebitda !== 0 &&
+    (debt !== undefined || cash !== undefined)
+  ) {
+    const netDebt = (debt ?? 0) - (cash ?? 0);
+    derived.netDebtToEbitda = netDebt / ebitda;
+  }
+
+  if (latestIncome?.netIncome && latestCashflow?.dividendsPaid) {
+    // dividendsPaid no Yahoo vem negativo (saída de caixa). Pegamos o módulo.
+    const div = Math.abs(latestCashflow.dividendsPaid);
+    if (latestIncome.netIncome > 0) {
+      derived.payoutRatio = div / latestIncome.netIncome;
+    }
+  }
+
+  if (
+    latestIncome?.grossProfit !== undefined &&
+    latestIncome.totalRevenue
+  ) {
+    derived.grossMargin =
+      latestIncome.grossProfit / latestIncome.totalRevenue;
+  }
+  if (
+    latestIncome?.operatingIncome !== undefined &&
+    latestIncome.totalRevenue
+  ) {
+    derived.operatingMargin =
+      latestIncome.operatingIncome / latestIncome.totalRevenue;
+  }
+
+  return derived;
+}
+
+// --- Peers (Sprint v1.2-B) ----------------------------------------------
+
+export async function getPeerQuotes(
+  symbols: string[]
+): Promise<PeerQuote[]> {
+  if (symbols.length === 0) return [];
+  const out: PeerQuote[] = [];
+  await Promise.all(
+    symbols.map(async (sym) => {
+      try {
+        const { yahooSymbol, displayTicker, assetClass } = normalizeTicker(sym);
+        const q = (await yahooFinance.quote(yahooSymbol)) as RawQuote & {
+          marketCap?: number;
+          trailingPE?: number;
+          fiftyTwoWeekChange?: number;
+          fiftyTwoWeekChangePercent?: number;
+        };
+        const price = q.regularMarketPrice ?? 0;
+        const previousClose = q.regularMarketPreviousClose ?? price;
+        const changePercent =
+          previousClose > 0 ? ((price - previousClose) / previousClose) * 100 : 0;
+        out.push({
+          ticker: yahooSymbol,
+          displayTicker,
+          name: q.longName ?? q.shortName ?? displayTicker,
+          price,
+          changePercent,
+          marketCap: q.marketCap,
+          trailingPE: q.trailingPE,
+          fiftyTwoWeekChangePercent:
+            q.fiftyTwoWeekChangePercent ?? q.fiftyTwoWeekChange,
+          currency: q.currency ?? (assetClass === "stock_br" ? "BRL" : "USD"),
+        });
+      } catch {
+        // peer indisponível — ignora silenciosamente, lista é heurística
+      }
+    })
+  );
+  return out;
 }
