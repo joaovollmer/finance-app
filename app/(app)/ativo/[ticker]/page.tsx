@@ -174,6 +174,7 @@ export default async function AtivoPage({
               ownedQuantity={ownedQty}
               fxRate={fx?.rate}
               fxDate={fx?.date}
+              depositMode={portfolio.deposit_mode === true}
             />
           </SectionCard>
         </div>

@@ -121,6 +121,7 @@ export default async function RendaFixaPage() {
               catalog={catalog}
               fxRate={usdBrl?.rate}
               fxDate={usdBrl?.date}
+              depositMode={portfolio.deposit_mode === true}
             />
           </SectionCard>
         </div>

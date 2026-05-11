@@ -15,6 +15,7 @@ interface Props {
   // Câmbio para converter principais em USD para BRL na hora de debitar
   fxRate?: number;
   fxDate?: string;
+  depositMode?: boolean;
 }
 
 export interface BondOption {
@@ -40,6 +41,7 @@ export default function BondOrderForm({
   catalog,
   fxRate,
   fxDate,
+  depositMode = false,
 }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(catalog[0]?.id ?? "");
@@ -84,7 +86,7 @@ export default function BondOrderForm({
       setError("Câmbio indisponível para títulos em USD.");
       return;
     }
-    if (cashAmount > cashBalance) {
+    if (!depositMode && cashAmount > cashBalance) {
       setError("Saldo insuficiente em caixa.");
       return;
     }
@@ -216,6 +218,16 @@ export default function BondOrderForm({
           label="Saldo em caixa"
           value={formatBR(cashBalance, portfolioCurrency)}
         />
+        {depositMode && cashAmount > cashBalance && (
+          <Row
+            hint
+            label="Novo aporte necessário"
+            value={formatBR(
+              Math.max(0, cashAmount - cashBalance),
+              portfolioCurrency
+            )}
+          />
+        )}
       </div>
 
       {error && (

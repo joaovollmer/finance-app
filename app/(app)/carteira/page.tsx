@@ -8,6 +8,7 @@ import {
   formatCurrency,
   formatPercent,
   pnl,
+  portfolioPnL,
   type HoldingRow,
   type PortfolioRow,
 } from "@/lib/portfolio/valuation";
@@ -120,11 +121,12 @@ export default async function CarteiraPage() {
   const positionsValue = stocksValue + bondsValue;
 
   const totalValue = Number(portfolio.cash_balance) + positionsValue;
-  const totalPnL = totalValue - Number(portfolio.initial_cash);
-  const totalPnLPct =
-    portfolio.initial_cash > 0
-      ? (totalPnL / Number(portfolio.initial_cash)) * 100
-      : 0;
+  const depositMode = portfolio.deposit_mode === true;
+  const {
+    baseline,
+    absolute: totalPnL,
+    percent: totalPnLPct,
+  } = portfolioPnL(portfolio, totalValue);
 
   const { data: snapshots } = await supabase
     .from("portfolio_snapshots")
@@ -133,10 +135,11 @@ export default async function CarteiraPage() {
     .order("taken_on", { ascending: true });
 
   const today = new Date().toISOString().slice(0, 10);
+  const seedValue = depositMode ? 0 : Number(portfolio.initial_cash);
   const series: SeriesPoint[] = [
     {
       date: portfolio.created_at.slice(0, 10),
-      value: portfolio.initial_cash,
+      value: seedValue,
     },
     ...((snapshots ?? []) as { taken_on: string; total_value: number }[]).map(
       (s) => ({ date: s.taken_on, value: s.total_value })
@@ -174,16 +177,32 @@ export default async function CarteiraPage() {
           hint="Posições + caixa"
           icon="◈"
         />
+        {depositMode ? (
+          <StatCard
+            label="Total Aportado"
+            value={formatCurrency(baseline, portfolio.currency)}
+            hint={`Caixa atual: ${formatCurrency(portfolio.cash_balance, portfolio.currency)}`}
+            icon="◎"
+          />
+        ) : (
+          <StatCard
+            label="Saldo em Caixa"
+            value={formatCurrency(portfolio.cash_balance, portfolio.currency)}
+            hint={`de ${formatCurrency(portfolio.initial_cash, portfolio.currency)} aportados`}
+            icon="◎"
+          />
+        )}
         <StatCard
-          label="Saldo em Caixa"
-          value={formatCurrency(portfolio.cash_balance, portfolio.currency)}
-          hint={`de ${formatCurrency(portfolio.initial_cash, portfolio.currency)} aportados`}
-          icon="◎"
-        />
-        <StatCard
-          label="Resultado Total"
+          label={depositMode ? "Valorização" : "Resultado Total"}
           value={formatCurrency(totalPnL, portfolio.currency)}
-          hint={formatPercent(totalPnLPct) + " desde o início"}
+          hint={
+            baseline > 0
+              ? formatPercent(totalPnLPct) +
+                (depositMode ? " sobre o aporte" : " desde o início")
+              : depositMode
+                ? "Faça sua primeira compra"
+                : "—"
+          }
           tone={totalPnL >= 0 ? "positive" : "negative"}
           icon={totalPnL >= 0 ? "▲" : "▼"}
         />
