@@ -309,6 +309,47 @@ e cada compra incrementa o aporte.
   coluna inexistente. Conferir via `select version from public._migrations
   where version='0007_deposit_on_buy'`.
 
+## v1.2 — Sprint D (pluralização de providers de notícias) — maio/2026
+
+Branch: `claude/v1.2-news-providers-sprint-d`. Estende Sprint C: o módulo
+de notícias vira um orquestrador multi-provider com dedupe, em vez de só
+Yahoo + fallback Google.
+
+- **Estrutura nova:**
+  - `lib/market/news/index.ts` — orquestrador público; mantém `getAssetNews`
+    e re-exporta `parseGoogleNewsRss` para compatibilidade com testes.
+  - `lib/market/news/types.ts` — `NewsItem`, `NewsProvider`, `NewsSource`
+    (`yahoo` | `finnhub` | `google_rss`), `NewsSentiment`.
+  - `lib/market/news/rss.ts` — parser do Google News RSS (extraído da
+    versão monolítica).
+  - `lib/market/news/providers/{yahoo,finnhub,google_rss}.ts` — cada
+    provider implementa `NewsProvider`. `enabled()` decide se entra na
+    rodada.
+- **Orquestração:** todos os providers ativos rodam em paralelo via
+  `Promise.allSettled`. Resultado bruto é ordenado por `publishedAt`
+  desc e passa pelo dedupe (preserva primeira ocorrência).
+- **Dedupe:** `canonicalUrl(url)` remove query string + fragmento +
+  trailing slash + força lowercase; `normalizeTitle` tira pontuação e
+  espaços extras. Notícias idênticas vindas de fontes diferentes (Yahoo
+  e Finnhub publicam a mesma manchete da Reuters, p.ex.) caem para uma
+  só.
+- **Finnhub:** opcional via `FINNHUB_API_KEY`. Sem chave, `enabled()`
+  devolve false e o provider é pulado. Janela de busca: últimos 30
+  dias. Pula tickers `.SA` (cobertura B3 fraca).
+- **Cache:** mantido em memória, 15min por `(yahooSymbol, limit)` —
+  mesmo TTL da Sprint C.
+- **Compatibilidade:** assinatura pública (`getAssetNews(ticker, limit)`,
+  tipo `NewsItem`) idêntica. Endpoint `/api/news` e `NewsPanel` não
+  mudam. `lib/market/news.ts` antigo foi removido — Node resolve
+  `lib/market/news` como pasta via `index.ts`.
+- **Tipos:** `NewsItem.sentiment` (`positive | neutral | negative`)
+  opcional. Hoje só Finnhub poderia populá-lo, mas o endpoint free não
+  retorna score — fica `undefined` até integrarmos a versão paga.
+- **Testes:** mantemos os 6 originais do parser + 3 de `canonicalUrl` +
+  3 de `dedupeNews` = 12 no arquivo. Total: 40 testes verdes.
+- **Env:** `.env.example` ganha bloco `FINNHUB_API_KEY=`.
+- **Sem migration.**
+
 ## v1.2 — Sprint C (notícias por ativo) — maio/2026
 
 Branch: `claude/v1.2-news-sprint-c`. Primeiro entregável da v1.2 (warm-up

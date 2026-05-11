@@ -31,8 +31,11 @@ A linguagem é acessível ao leigo, mas os dados têm profundidade para o avanç
   via BCB SGS + Treasury Fiscal Data.
 - **Dashboard `/carteira`** com patrimônio total, P&L, posições de RV e RF,
   gráfico de evolução com snapshot diário.
-- **Notícias por ativo** (v1.2 — Sprint C): manchetes recentes via Yahoo
-  Finance com fallback para Google News RSS, exibidas no detalhe do ativo.
+- **Notícias por ativo** (v1.2 — Sprints C + D): manchetes ticker-aware
+  agregadas de múltiplos providers (Yahoo + Finnhub opcional para US +
+  Google News RSS), com dedupe por URL canônica e título normalizado.
+  Configure `FINNHUB_API_KEY` para incluir o terceiro provider; sem
+  chave, ele é pulado silenciosamente.
 - **Onboarding flexível** (v1.2 — Sprint A): saldo inicial deixou de ser
   obrigatório. No modo deposit-on-buy a carteira começa zerada e cada
   compra incrementa o `total_deposited`; o dashboard mostra "Total
@@ -62,7 +65,8 @@ app/
     ativo/[ticker]/                 # detalhe + gráfico + OrderForm
   api/{quote,history,search,fx,news}/ # endpoints sobre os providers
 lib/
-  market/{yahoo,bcb,rates,news,types}.ts
+  market/{yahoo,bcb,rates,types}.ts
+  market/news/{index,types,rss}.ts + providers/{yahoo,finnhub,google_rss}.ts
   portfolio/{valuation,fixed_income}.ts
 components/
   auth/{AuthShell,LogoutButton}.tsx
@@ -304,9 +308,13 @@ Dividida em sprints, cada uma virando uma branch
   - Múltiplos históricos (P/L, P/VP, EV/EBITDA), payout, dívida líquida/EBITDA.
   - Histórico de dividendos, splits e recomendações de analistas.
   - Comparação setorial (peers).
-- Notícias do ativo ✅ (Sprint C): agregação de manchetes via
-  `yahoo-finance2.search().news` com fallback para RSS do Google News,
-  exibidas como cards com hyperlink em `/ativo/[ticker]`.
+- Notícias do ativo ✅ (Sprints C + D):
+  - **Sprint C:** agregação via `yahoo-finance2.search().news` com
+    fallback para RSS do Google News.
+  - **Sprint D:** refator em providers plugáveis (`lib/market/news/`).
+    Suporte a Finnhub para US (via `FINNHUB_API_KEY` opcional). Dedupe
+    por URL canônica + título normalizado. Cada provider declara
+    `enabled()` e é pulado silenciosamente quando a config falta.
 
 ### Fase 1.3 — Renda fixa e fundos via fontes brasileiras (semanas 4–8)
 
