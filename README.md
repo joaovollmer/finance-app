@@ -87,14 +87,24 @@ sentry.{client,server,edge}.config.ts
    migrations em ordem (SQL Editor → New Query) — ver
    [Runbook de migrations](#runbook-de-migrations) abaixo.
 2. Em **Authentication → Providers**, habilite "Email" com senha.
-3. Copie URL e `anon` key para `.env.local`:
+3. Em **Authentication → URL Configuration**, configure os redirects para
+   o fluxo de confirmação de e-mail (sem isso o link de confirmação aponta
+   para `http://localhost:3000` e não funciona em outros dispositivos):
+   - **Site URL:** a URL pública do app (ex.: `https://o-investidor.vercel.app`)
+     ou `http://localhost:3000` em dev.
+   - **Redirect URLs:** adicione todas as origens válidas, incluindo
+     `http://localhost:3000/auth/confirm`, `https://<seu-dominio>/auth/confirm`
+     e cada URL de preview da Vercel (`https://<deploy>-<hash>.vercel.app/auth/confirm`)
+     que você queira aceitar — pode usar wildcards
+     (`https://*-joaovollmer.vercel.app/auth/confirm`).
+4. Copie URL e `anon` key para `.env.local`:
 
 ```bash
 cp .env.example .env.local
 # preencher NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
 
-4. Instale e rode:
+5. Instale e rode:
 
 ```bash
 npm install
