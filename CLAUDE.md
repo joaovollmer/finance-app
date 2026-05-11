@@ -224,6 +224,65 @@ Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
    RFR/XGBoost/LSTM e SHAP.
 6. **Qualidade contínua (v1.6):** cache, RSC streaming, acessibilidade.
 
+## v1.2 — Sprint B (fundamentalismo profundo) — maio/2026
+
+Branch: `claude/v1.2-fundamentals-sprint-b`. Detalhe do ativo ganha
+demonstrativos anuais (4 anos), múltiplos derivados, recomendações de
+analistas e peers setoriais. InfoTooltip redesenhado para a11y/posicionamento.
+
+- **`lib/market/yahoo.ts`:** novo `getAssetFundamentals(ticker)` chama
+  `quoteSummary` com 6 módulos extras: `incomeStatementHistory`,
+  `balanceSheetHistory`, `cashflowStatementHistory`, `recommendationTrend`,
+  `upgradeDowngradeHistory` (+ `price` para market cap). Cache em memória
+  por 1h. Helpers `dateString` lidam com os 3 formatos que o Yahoo usa
+  para data (Date, epoch raw, `{ raw, fmt }`).
+- **`deriveMultiples(...)`:** função pura que calcula EV/EBITDA, dívida
+  líquida/EBITDA, payout (usando módulo de `dividendsPaid` porque o Yahoo
+  retorna negativo), margem bruta e margem operacional. Testada com 6
+  casos cobrindo edge cases (EBITDA zero, lucro negativo, etc.).
+- **`getPeerQuotes(symbols)`:** dispara `yahooFinance.quote` em paralelo
+  para uma lista de peers, normaliza tickers `.SA` e ignora silenciosamente
+  os que falham. Lista heurística — peers são apenas comparação.
+- **`lib/market/peers.ts`:** catálogo curado (15 buckets) que mapeia
+  industry/sector → 4-6 tickers BR/US por setor. `resolvePeers` tenta
+  primeiro por industry (mais específico), cai pra sector, ou devolve
+  vazio. Sempre remove o ticker próprio da lista. Testado com 4 casos.
+- **`FundamentalsPanel`** (client component): tabs Resultado / Balanço /
+  Caixa / Múltiplos / Recomendações. Tabelas com 4 anos lado a lado e
+  formatação compacta de moeda. Aba Recomendações mostra barra
+  proporcional (Strong Buy ... Strong Sell) + tabela de upgrades/downgrades
+  recentes.
+- **`PeersPanel`** (server component): tabela com ticker, cotação,
+  variação do dia, market cap, P/L e 52w change. Cada peer é link para
+  `/ativo/[ticker]` — navegação fluida entre concorrentes.
+- **`InfoTooltip` redesenhado:**
+  - **Bug visual original:** dentro de headers com `uppercase` +
+    `tracking-[0.05em]`, o tooltip herdava letterSpacing/textTransform e
+    ficava ilegível.
+  - Fix: `letterSpacing: 0` + `textTransform: none` inline.
+  - Adicionado: posicionamento dinâmico (top vs bottom conforme espaço
+    na viewport), pino com seta apontando, dispensa em `Esc`/clique fora,
+    foco visível (`focus:ring`), `aria-describedby`/`aria-expanded`,
+    bordas mais marcadas no botão `?`.
+- **Glossário:** 22 entradas novas em `lib/glossary.ts` cobrindo todos
+  os novos indicadores (receita, EBITDA, balanço, FCF, EV/EBITDA, etc.).
+- **Integração:** `app/(app)/ativo/[ticker]/page.tsx` adiciona
+  `getAssetFundamentals` e `getPeerQuotes` no `Promise.all` existente.
+  Painéis só renderizam quando há dados; empty states amigáveis quando
+  Yahoo não publica os demonstrativos (comum para empresas BR).
+- **Modal didático de recomendações** (`components/ui/Modal.tsx` +
+  `RatingsHelpModal` em `FundamentalsPanel`): clicar no card da barra
+  Strong Buy → Strong Sell abre overlay com `backdrop-blur` explicando
+  como as classificações são formadas (quem produz, o que cada uma
+  significa, sobre o que analistas olham, como interpretar consenso,
+  por que não seguir cegamente, fonte + disclaimer). Componente Modal
+  genérico reutilizável: trava scroll do body, dispensa em Esc/clique
+  fora, `aria-modal`.
+- **Testes:** `__tests__/market/fundamentals.test.ts` (10 testes:
+  `deriveMultiples` 6 + `resolvePeers` 4). Build verde, 44 testes no
+  total.
+- **Sem migration.** Sem mudança de schema.
+
 ## v1.2 — Hotfix auth confirm (maio/2026)
 
 Branch: `claude/v1.2-hotfix-auth-confirm`. Corrige fluxo de confirmação de

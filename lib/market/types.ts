@@ -76,3 +76,78 @@ export interface AssetSummary {
   totalRevenue?: number;
 }
 
+// Fundamentos profundos (Sprint v1.2-B). Carregados sob demanda além do
+// AssetSummary porque exigem mais módulos do quoteSummary.
+
+export interface IncomeStatementYear {
+  endDate: string;
+  totalRevenue?: number;
+  grossProfit?: number;
+  operatingIncome?: number;
+  ebitda?: number;
+  netIncome?: number;
+}
+
+export interface BalanceSheetYear {
+  endDate: string;
+  totalAssets?: number;
+  totalLiabilities?: number;
+  totalEquity?: number;
+  totalCash?: number;
+  totalDebt?: number;
+}
+
+export interface CashflowYear {
+  endDate: string;
+  operatingCashflow?: number;
+  capitalExpenditures?: number;
+  freeCashflow?: number;
+  dividendsPaid?: number;
+}
+
+export interface RecommendationTrend {
+  period: string;
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+}
+
+export interface UpgradeDowngrade {
+  date: string;
+  firm: string;
+  fromGrade?: string;
+  toGrade?: string;
+  action?: string;
+}
+
+export interface AssetFundamentals {
+  income: IncomeStatementYear[];
+  balance: BalanceSheetYear[];
+  cashflow: CashflowYear[];
+  recommendations: RecommendationTrend[];
+  upgrades: UpgradeDowngrade[];
+  // Múltiplos derivados a partir dos demonstrativos + market cap.
+  derived: {
+    evEbitda?: number;
+    netDebtToEbitda?: number;
+    payoutRatio?: number;
+    grossMargin?: number;
+    operatingMargin?: number;
+  };
+}
+
+export interface PeerQuote {
+  ticker: string;
+  displayTicker: string;
+  name: string;
+  price: number;
+  changePercent: number;
+  marketCap?: number;
+  trailingPE?: number;
+  fiftyTwoWeekChangePercent?: number;
+  currency: string;
+}
+
+

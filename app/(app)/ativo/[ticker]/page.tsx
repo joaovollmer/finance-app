@@ -17,6 +17,14 @@ import {
   mergeQuote,
   mergeSummary,
 } from "@/lib/market/aggregate";
+import {
+  getAssetFundamentals,
+  getAssetSummary,
+  getHistory,
+  getPeerQuotes,
+  getQuote,
+} from "@/lib/market/yahoo";
+import { resolvePeers } from "@/lib/market/peers";
 import { getUsdToBrl } from "@/lib/market/bcb";
 import { getAssetNews } from "@/lib/market/news";
 import { formatCurrency } from "@/lib/portfolio/valuation";
@@ -24,6 +32,8 @@ import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
 import AssetSummaryPanel from "@/components/market/AssetSummaryPanel";
 import FinnhubSignalsPanel from "@/components/market/FinnhubSignalsPanel";
+import FundamentalsPanel from "@/components/market/FundamentalsPanel";
+import PeersPanel from "@/components/market/PeersPanel";
 import NewsPanel from "@/components/market/NewsPanel";
 import { SectionCard, Badge } from "@/components/ui/Card";
 
@@ -47,12 +57,16 @@ export default async function AtivoPage({
   let candles;
   let summaryRaw = null;
   let news: Awaited<ReturnType<typeof getAssetNews>> = [];
+  let fundamentals: Awaited<ReturnType<typeof getAssetFundamentals>> | null =
+    null;
   try {
     [quoteRaw, candles, summaryRaw, news] = await Promise.all([
+    [quote, candles, summary, news, fundamentals] = await Promise.all([
       getQuote(decoded),
       getHistory(decoded, "1y"),
       getAssetSummary(decoded).catch(() => null),
       getAssetNews(decoded).catch(() => []),
+      getAssetFundamentals(decoded).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -110,6 +124,20 @@ export default async function AtivoPage({
     (Array.isArray(fhEarnings) && fhEarnings.length > 0) ||
     (Array.isArray(fhRecs) && fhRecs.length > 0) ||
     Object.values(extras).some((v) => v !== undefined);
+  // Peers via lista curada por setor/indústria (heurística — não bloqueia
+  // se vier vazia).
+  const peerSymbols = summary
+    ? resolvePeers({
+        ticker: quote.ticker,
+        sector: summary.sector,
+        industry: summary.industry,
+        isB3: quote.assetClass === "stock_br",
+      })
+    : [];
+  const peers =
+    peerSymbols.length > 0
+      ? await getPeerQuotes(peerSymbols).catch(() => [])
+      : [];
 
   const { data: portfolios } = await supabase
     .from("portfolios")
@@ -217,6 +245,28 @@ export default async function AtivoPage({
                 recommendations={fhRecs}
                 extras={extras}
               />
+          {fundamentals &&
+            (fundamentals.income.length > 0 ||
+              fundamentals.balance.length > 0 ||
+              fundamentals.cashflow.length > 0 ||
+              fundamentals.recommendations.length > 0) && (
+              <SectionCard
+                title="Demonstrativos e múltiplos"
+                subtitle="Resultado, balanço, fluxo de caixa, múltiplos derivados e recomendações"
+              >
+                <FundamentalsPanel
+                  fundamentals={fundamentals}
+                  currency={quote.currency}
+                />
+              </SectionCard>
+            )}
+
+          {peers.length > 0 && (
+            <SectionCard
+              title="Comparação setorial"
+              subtitle={`Peers em ${summary?.industry ?? summary?.sector ?? "mesmo setor"}`}
+            >
+              <PeersPanel peers={peers} />
             </SectionCard>
           )}
 

@@ -55,4 +55,42 @@ export const GLOSSARY = {
     "Diferença entre o lucro por ação reportado e a estimativa média dos analistas para o trimestre. Surpresa positiva = empresa superou expectativa.",
   insiderTransactions:
     "Compras e vendas de ações feitas por executivos e diretores da empresa, reportadas à SEC. Insider comprando = sinal positivo (acreditam na empresa); vendendo = pode ser realização de lucro ou sinal de alerta.",
+  totalRevenue:
+    "Receita bruta total no ano. Soma de tudo que a empresa faturou antes de descontar custos, despesas e impostos.",
+  grossProfit:
+    "Lucro bruto: receita menos o custo direto dos produtos/serviços vendidos. Mostra a eficiência operacional básica.",
+  operatingIncome:
+    "Lucro antes de impostos e despesas financeiras, depois de descontar custos operacionais.",
+  ebitda:
+    "Lucro antes de juros, impostos, depreciação e amortização. Aproximação da geração de caixa operacional.",
+  netIncome:
+    "Lucro líquido: resultado final do ano depois de todas as despesas, juros e impostos. Base para dividendos e LPA.",
+  totalAssets:
+    "Tudo que a empresa possui: caixa, estoques, imóveis, equipamentos, investimentos e direitos a receber.",
+  totalLiabilities:
+    "Tudo que a empresa deve: fornecedores, empréstimos, salários a pagar, impostos pendentes etc.",
+  totalEquity:
+    "Patrimônio líquido: ativos menos passivos. O que sobraria para os acionistas se a empresa vendesse tudo e quitasse as dívidas.",
+  totalCash:
+    "Caixa e equivalentes de caixa no balanço. Reserva líquida pronta para uso.",
+  totalDebt:
+    "Dívida total (curto + longo prazo): empréstimos, debêntures e financiamentos.",
+  operatingCashflow:
+    "Geração de caixa da operação no ano — quanto a empresa entrou de dinheiro pelo seu core business.",
+  capitalExpenditures:
+    "CAPEX: investimentos em ativos de longo prazo (fábricas, equipamentos, infraestrutura). Geralmente aparece negativo.",
+  freeCashflow:
+    "Caixa que sobra depois de manter e expandir o negócio (operacional − CAPEX). Indicador chave de saúde financeira.",
+  dividendsPaid:
+    "Total distribuído aos acionistas no ano em dividendos e JCP.",
+  evEbitda:
+    "Enterprise Value sobre EBITDA — quantos anos de geração de caixa operacional seriam necessários pra pagar a empresa toda (incluindo dívida).",
+  netDebtToEbitda:
+    "Dívida líquida / EBITDA. Mede capacidade de pagamento: 1x baixo, 3x+ exige atenção, 5x+ alavancagem alta.",
+  payoutRatio:
+    "Porcentagem do lucro distribuído como dividendos. Alto = mais renda hoje; baixo = mais reinvestimento.",
+  grossMargin:
+    "Lucro bruto sobre receita. Mostra quanto sobra depois do custo direto do produto.",
+  operatingMargin:
+    "Lucro operacional sobre receita. Eficiência depois de pagar todos os custos operacionais (sem juros e impostos).",
 } as const;
