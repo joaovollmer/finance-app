@@ -1,22 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getAssetSummary, getHistory, getQuote } from "@/lib/market/yahoo";
-import {
-  getFinnhubEarnings,
-  getFinnhubInsiderTransactions,
-  getFinnhubMetrics,
-  getFinnhubPriceTarget,
-  getFinnhubProfile,
-  getFinnhubQuote,
-  getFinnhubRecommendations,
-  finnhubEnabled,
-} from "@/lib/market/finnhub";
-import {
-  extractFinnhubExtras,
-  mergeQuote,
-  mergeSummary,
-} from "@/lib/market/aggregate";
 import {
   getAssetFundamentals,
   getAssetSummary,
@@ -25,15 +9,30 @@ import {
   getQuote,
 } from "@/lib/market/yahoo";
 import { resolvePeers } from "@/lib/market/peers";
+import {
+  finnhubEnabled,
+  getFinnhubEarnings,
+  getFinnhubInsiderTransactions,
+  getFinnhubMetrics,
+  getFinnhubPriceTarget,
+  getFinnhubProfile,
+  getFinnhubQuote,
+  getFinnhubRecommendations,
+} from "@/lib/market/finnhub";
+import {
+  extractFinnhubExtras,
+  mergeQuote,
+  mergeSummary,
+} from "@/lib/market/aggregate";
 import { getUsdToBrl } from "@/lib/market/bcb";
 import { getAssetNews } from "@/lib/market/news";
 import { formatCurrency } from "@/lib/portfolio/valuation";
 import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
 import AssetSummaryPanel from "@/components/market/AssetSummaryPanel";
-import FinnhubSignalsPanel from "@/components/market/FinnhubSignalsPanel";
 import FundamentalsPanel from "@/components/market/FundamentalsPanel";
 import PeersPanel from "@/components/market/PeersPanel";
+import FinnhubSignalsPanel from "@/components/market/FinnhubSignalsPanel";
 import NewsPanel from "@/components/market/NewsPanel";
 import { SectionCard, Badge } from "@/components/ui/Card";
 
@@ -55,13 +54,12 @@ export default async function AtivoPage({
 
   let quoteRaw;
   let candles;
-  let summaryRaw = null;
+  let summaryRaw: Awaited<ReturnType<typeof getAssetSummary>> | null = null;
   let news: Awaited<ReturnType<typeof getAssetNews>> = [];
   let fundamentals: Awaited<ReturnType<typeof getAssetFundamentals>> | null =
     null;
   try {
-    [quoteRaw, candles, summaryRaw, news] = await Promise.all([
-    [quote, candles, summary, news, fundamentals] = await Promise.all([
+    [quoteRaw, candles, summaryRaw, news, fundamentals] = await Promise.all([
       getQuote(decoded),
       getHistory(decoded, "1y"),
       getAssetSummary(decoded).catch(() => null),
@@ -107,9 +105,7 @@ export default async function AtivoPage({
       ? getFinnhubEarnings(decoded).catch(
           () => [] as Awaited<ReturnType<typeof getFinnhubEarnings>>
         )
-      : Promise.resolve(
-          [] as Awaited<ReturnType<typeof getFinnhubEarnings>>
-        ),
+      : Promise.resolve([] as Awaited<ReturnType<typeof getFinnhubEarnings>>),
   ]);
 
   const quote = mergeQuote(quoteRaw, fhQuote);
@@ -120,10 +116,11 @@ export default async function AtivoPage({
 
   const hasFinnhubSignals =
     fhTarget !== null ||
-    (Array.isArray(fhInsiders) && fhInsiders.length > 0) ||
-    (Array.isArray(fhEarnings) && fhEarnings.length > 0) ||
-    (Array.isArray(fhRecs) && fhRecs.length > 0) ||
+    fhInsiders.length > 0 ||
+    fhEarnings.length > 0 ||
+    fhRecs.length > 0 ||
     Object.values(extras).some((v) => v !== undefined);
+
   // Peers via lista curada por setor/indústria (heurística — não bloqueia
   // se vier vazia).
   const peerSymbols = summary
@@ -231,20 +228,6 @@ export default async function AtivoPage({
             </SectionCard>
           )}
 
-          {hasFinnhubSignals && (
-            <SectionCard
-              title="Sinais de mercado"
-              subtitle="Preço-alvo, transações de insiders e earnings via Finnhub"
-            >
-              <FinnhubSignalsPanel
-                currency={quote.currency}
-                currentPrice={quote.price}
-                priceTarget={fhTarget}
-                insiders={fhInsiders}
-                earnings={fhEarnings}
-                recommendations={fhRecs}
-                extras={extras}
-              />
           {fundamentals &&
             (fundamentals.income.length > 0 ||
               fundamentals.balance.length > 0 ||
@@ -260,6 +243,23 @@ export default async function AtivoPage({
                 />
               </SectionCard>
             )}
+
+          {hasFinnhubSignals && (
+            <SectionCard
+              title="Sinais de mercado"
+              subtitle="Preço-alvo, transações de insiders e earnings via Finnhub"
+            >
+              <FinnhubSignalsPanel
+                currency={quote.currency}
+                currentPrice={quote.price}
+                priceTarget={fhTarget}
+                insiders={fhInsiders}
+                earnings={fhEarnings}
+                recommendations={fhRecs}
+                extras={extras}
+              />
+            </SectionCard>
+          )}
 
           {peers.length > 0 && (
             <SectionCard

@@ -74,14 +74,13 @@ app/
     ativo/[ticker]/                 # detalhe + gráfico + OrderForm
   api/{quote,history,search,fx,news}/ # endpoints sobre os providers
 lib/
-  market/{yahoo,finnhub,aggregate,bcb,rates,types}.ts
+  market/{yahoo,finnhub,aggregate,bcb,rates,peers,types}.ts
   market/news/{index,types,rss}.ts + providers/{yahoo,finnhub,google_rss}.ts
-  market/{yahoo,bcb,rates,news,peers,types}.ts
   portfolio/{valuation,fixed_income}.ts
 components/
   auth/{AuthShell,LogoutButton}.tsx
   charts/PortfolioChart.tsx
-  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,FundamentalsPanel,PeersPanel,NewsPanel}.tsx
+  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,FundamentalsPanel,PeersPanel,FinnhubSignalsPanel,NewsPanel}.tsx
   ui/{Card,InfoTooltip,LogoMark,NavLink}.tsx
 supabase/migrations/
   0001_init.sql                     # schema + RLS + RPC execute_order
