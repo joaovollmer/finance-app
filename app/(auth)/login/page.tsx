@@ -24,6 +24,7 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const redirect = params.get("redirect") ?? "/carteira";
+  const confirmed = params.get("confirmed") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -74,6 +75,12 @@ function LoginForm() {
       <p className="mt-1.5 mb-7 text-sm text-ink-muted">
         Acesse sua carteira e acompanhe seus investimentos.
       </p>
+
+      {confirmed && (
+        <div className="mb-4 rounded-xl border border-positive-border bg-positive-pastel px-3.5 py-2.5 text-[13px] font-medium text-positive">
+          E-mail confirmado. Entre para continuar.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
         <Field label="E-mail">

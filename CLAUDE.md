@@ -224,6 +224,44 @@ Detalhamento em [README.md](./README.md#plano-de-ação--pós-10). Resumo:
    RFR/XGBoost/LSTM e SHAP.
 6. **Qualidade contínua (v1.6):** cache, RSC streaming, acessibilidade.
 
+## v1.2 — Hotfix auth confirm (maio/2026)
+
+Branch: `claude/v1.2-hotfix-auth-confirm`. Corrige fluxo de confirmação de
+e-mail. Sintoma reportado: usuário cria conta, clica no link do e-mail no
+celular e recebe `ERR_CONNECTION_FAILED` para `localhost:3000`.
+
+- **Causa raiz dupla:**
+  1. `signUp` chamava `supabase.auth.signUp({ email, password })` sem
+     `options.emailRedirectTo`. Supabase então usa o `Site URL` configurado
+     no dashboard. Como o projeto estava com `Site URL=http://localhost:3000`,
+     todo e-mail de confirmação apontava para localhost — quebrado em
+     qualquer dispositivo que não fosse a máquina de dev original.
+  2. Não havia rota `/auth/confirm` no app. Mesmo se o `Site URL` estivesse
+     correto, a troca do `token_hash`/`code` por sessão precisa de um
+     handler — sem ele, o link só renderiza a home (sem sessão).
+- **Fix de código:**
+  - `app/auth/confirm/route.ts`: Route Handler GET que aceita os dois
+    fluxos do Supabase (`token_hash` + `type` para o template novo,
+    `code` para PKCE) e chama `verifyOtp` / `exchangeCodeForSession`.
+    Em sucesso redireciona para `?next=` (default `/auth/welcome`); em
+    erro, para `/auth/confirm/erro?reason=<msg>`.
+  - `app/auth/welcome/page.tsx`: tela de boas-vindas pós-confirmação com
+    AuthShell, ícone ✓ e CTA contextual (`/onboarding` se o usuário ainda
+    não criou portfolio, `/carteira` caso contrário). Sem sessão, manda
+    pra `/login?confirmed=1` (usuário abriu o link em outro browser).
+  - `app/auth/confirm/erro/page.tsx`: estado de falha com explicação
+    (links expiram em 24h, só funcionam uma vez) e atalhos para `/login`
+    e `/cadastro`.
+  - `/cadastro` passa `options.emailRedirectTo: ${origin}/auth/confirm` no
+    `signUp` — usa o domínio atual do browser, então funciona em dev,
+    preview da Vercel e prod sem trocar config.
+  - `/login` aceita `?confirmed=1` e mostra banner "E-mail confirmado".
+- **Fix de configuração (operador):** README ganha passo 3 explicando que
+  no Supabase **Authentication → URL Configuration** é preciso setar
+  `Site URL` para o domínio público e adicionar `…/auth/confirm` à lista
+  de Redirect URLs (incluindo wildcards para previews).
+- **Sem migration.** Sem mudança de schema.
+
 ## v1.2 — Sprint A (onboarding flexível / deposit-on-buy) — maio/2026
 
 Branch: `claude/v1.2-onboarding-flex-sprint-a`. Saldo inicial deixou de ser

@@ -30,7 +30,13 @@ export default function CadastroPage() {
 
     setLoading(true);
     const supabase = createSupabaseBrowserClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
+      },
+    });
     setLoading(false);
 
     if (error) {
@@ -43,7 +49,7 @@ export default function CadastroPage() {
       router.refresh();
     } else {
       setInfo(
-        "Cadastro realizado. Verifique seu e-mail para confirmar a conta antes de entrar."
+        "Cadastro realizado. Enviamos um link de confirmação para o seu e-mail — verifique a caixa de entrada (e a pasta de spam) e clique para ativar a conta."
       );
     }
   }
