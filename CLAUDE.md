@@ -309,11 +309,17 @@ e cada compra incrementa o aporte.
   coluna inexistente. Conferir via `select version from public._migrations
   where version='0007_deposit_on_buy'`.
 
-## v1.2 — Sprint D (pluralização de providers de notícias) — maio/2026
+## v1.2 — Sprint D (integração Finnhub multi-fonte) — maio/2026
 
-Branch: `claude/v1.2-news-providers-sprint-d`. Estende Sprint C: o módulo
-de notícias vira um orquestrador multi-provider com dedupe, em vez de só
-Yahoo + fallback Google.
+Branch: `claude/v1.2-news-providers-sprint-d` (nome legado — escopo
+expandido depois da fase 1). Renomeado conceitualmente para
+**"Integração Finnhub"**: além de notícias, consome todos os endpoints
+free do Finnhub e faz merge com Yahoo para dados financeiros.
+
+### Fase 1: pluralização de providers de notícias
+
+Refator do módulo `lib/market/news.ts` monolítico em arquitetura
+plugável.
 
 - **Estrutura nova:**
   - `lib/market/news/index.ts` — orquestrador público; mantém `getAssetNews`
@@ -346,9 +352,62 @@ Yahoo + fallback Google.
   opcional. Hoje só Finnhub poderia populá-lo, mas o endpoint free não
   retorna score — fica `undefined` até integrarmos a versão paga.
 - **Testes:** mantemos os 6 originais do parser + 3 de `canonicalUrl` +
-  3 de `dedupeNews` = 12 no arquivo. Total: 40 testes verdes.
+  3 de `dedupeNews` = 12 no arquivo. Total: 40 testes verdes nesta fase.
 - **Env:** `.env.example` ganha bloco `FINNHUB_API_KEY=`.
-- **Sem migration.**
+
+### Fase 2: dados financeiros completos via Finnhub
+
+Expansão pedida pelo usuário — em vez de só notícias, mergeamos Yahoo +
+Finnhub para todas as fontes de dado disponíveis no free tier.
+
+- **`lib/market/finnhub.ts`:** 7 adapters tipados, todos com cache de
+  30 min e tag Sentry `area=finnhub,path=<endpoint>`. Free tier: 60
+  req/min. Para tickers B3 (`.SA` ou padrão `XXXX[3-8]`), cada adapter
+  curto-circuita devolvendo null/[] — Finnhub tem cobertura fraca para
+  B3 e seria desperdício de quota.
+  - `getFinnhubQuote` — preço atual + high/low/open do dia
+  - `getFinnhubProfile` — perfil da empresa
+  - `getFinnhubMetrics` (+ `mapMetrics` puro) — 25+ indicadores
+    normalizados de percentual (4.2) para fração (0.042); marketCap
+    em milhões USD vira unidade
+  - `getFinnhubRecommendations` — trend mensal
+  - `getFinnhubPriceTarget` — consenso (low/mean/median/high)
+  - `getFinnhubInsiderTransactions` — janela 365d, top 12
+  - `getFinnhubEarnings` — surpresas dos últimos trimestres
+- **`lib/market/aggregate.ts`:**
+  - `mergeQuote(yahoo, finnhub)`: Yahoo continua sendo a fonte de verdade
+    do preço (consistência com ordem/FX). Finnhub adiciona `dayHigh`,
+    `dayLow`, `dayOpen`.
+  - `mergeSummary(yahoo, metrics, profile)`: Yahoo preferido quando o
+    campo existe; Finnhub preenche lacunas (sector/industry/country,
+    métricas básicas).
+  - `extractFinnhubExtras(metrics)`: campos Finnhub-only (payout, ROA,
+    debt/equity, current ratio, crescimento YoY, PEG, vs S&P 26 sem).
+- **`FinnhubSignalsPanel`:** painel novo no detalhe do ativo com:
+  - **Preço-alvo dos analistas** — slider visual com low/median/high +
+    marcador do preço atual + chip de upside %.
+  - **Indicadores complementares** — grid com payout, margens, ROA,
+    D/E, liquidez corrente, crescimento YoY, PEG, performance vs S&P.
+  - **Consenso Finnhub** — barra Strong Buy → Strong Sell (independente
+    do que Yahoo retorna).
+  - **Surpresas de earnings** — tabela últimos 4 trimestres com
+    estimativa vs real + variação %.
+  - **Transações de insiders** — tabela com data, nome, variação de
+    posição, preço, código SEC.
+  - Painel só aparece quando há pelo menos um sinal Finnhub.
+- **Integração na página `/ativo/[ticker]`:**
+  - 7 adapters Finnhub disparam em paralelo via `Promise.all` quando
+    `finnhubEnabled()` é true; quando não, cada slot devolve `null`/`[]`
+    via `Promise.resolve` para manter tipagem.
+  - Quote e summary passam por `mergeQuote` / `mergeSummary`.
+  - SectionCard "Sinais de mercado" só renderiza se `hasFinnhubSignals`.
+- **Glossary:** 11 entradas novas (priceTarget, payoutRatio, grossMargin,
+  operatingMargin, roa, debtToEquity, currentRatio, revenueGrowthYoy,
+  pegRatio, relativeToSP500, earningsSurprise, insiderTransactions).
+- **Testes:** `__tests__/market/finnhub.test.ts` (12 testes cobrindo
+  `mapMetrics`, `mergeQuote`, `mergeSummary`, `extractFinnhubExtras`).
+  Total: 52 testes verdes.
+- **Sem migration.** Sem mudança de schema.
 
 ## v1.2 — Sprint C (notícias por ativo) — maio/2026
 

@@ -2,12 +2,28 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAssetSummary, getHistory, getQuote } from "@/lib/market/yahoo";
+import {
+  getFinnhubEarnings,
+  getFinnhubInsiderTransactions,
+  getFinnhubMetrics,
+  getFinnhubPriceTarget,
+  getFinnhubProfile,
+  getFinnhubQuote,
+  getFinnhubRecommendations,
+  finnhubEnabled,
+} from "@/lib/market/finnhub";
+import {
+  extractFinnhubExtras,
+  mergeQuote,
+  mergeSummary,
+} from "@/lib/market/aggregate";
 import { getUsdToBrl } from "@/lib/market/bcb";
 import { getAssetNews } from "@/lib/market/news";
 import { formatCurrency } from "@/lib/portfolio/valuation";
 import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
 import AssetSummaryPanel from "@/components/market/AssetSummaryPanel";
+import FinnhubSignalsPanel from "@/components/market/FinnhubSignalsPanel";
 import NewsPanel from "@/components/market/NewsPanel";
 import { SectionCard, Badge } from "@/components/ui/Card";
 
@@ -27,12 +43,12 @@ export default async function AtivoPage({
 
   const decoded = decodeURIComponent(params.ticker);
 
-  let quote;
+  let quoteRaw;
   let candles;
-  let summary = null;
+  let summaryRaw = null;
   let news: Awaited<ReturnType<typeof getAssetNews>> = [];
   try {
-    [quote, candles, summary, news] = await Promise.all([
+    [quoteRaw, candles, summaryRaw, news] = await Promise.all([
       getQuote(decoded),
       getHistory(decoded, "1y"),
       getAssetSummary(decoded).catch(() => null),
@@ -41,6 +57,59 @@ export default async function AtivoPage({
   } catch {
     notFound();
   }
+
+  // Finnhub: roda em paralelo só quando há chave configurada. Para B3 cada
+  // adapter já retorna null silenciosamente — manter o gate aqui evita 7
+  // requests sem sentido.
+  const enabled = finnhubEnabled();
+  const [
+    fhQuote,
+    fhProfile,
+    fhMetrics,
+    fhTarget,
+    fhRecs,
+    fhInsiders,
+    fhEarnings,
+  ] = await Promise.all([
+    enabled ? getFinnhubQuote(decoded).catch(() => null) : Promise.resolve(null),
+    enabled ? getFinnhubProfile(decoded).catch(() => null) : Promise.resolve(null),
+    enabled ? getFinnhubMetrics(decoded).catch(() => null) : Promise.resolve(null),
+    enabled ? getFinnhubPriceTarget(decoded).catch(() => null) : Promise.resolve(null),
+    enabled
+      ? getFinnhubRecommendations(decoded).catch(
+          () => [] as Awaited<ReturnType<typeof getFinnhubRecommendations>>
+        )
+      : Promise.resolve(
+          [] as Awaited<ReturnType<typeof getFinnhubRecommendations>>
+        ),
+    enabled
+      ? getFinnhubInsiderTransactions(decoded).catch(
+          () => [] as Awaited<ReturnType<typeof getFinnhubInsiderTransactions>>
+        )
+      : Promise.resolve(
+          [] as Awaited<ReturnType<typeof getFinnhubInsiderTransactions>>
+        ),
+    enabled
+      ? getFinnhubEarnings(decoded).catch(
+          () => [] as Awaited<ReturnType<typeof getFinnhubEarnings>>
+        )
+      : Promise.resolve(
+          [] as Awaited<ReturnType<typeof getFinnhubEarnings>>
+        ),
+  ]);
+
+  const quote = mergeQuote(quoteRaw, fhQuote);
+  const summary = summaryRaw
+    ? mergeSummary(summaryRaw, fhMetrics, fhProfile)
+    : null;
+  const extras = extractFinnhubExtras(fhMetrics);
+
+  const hasFinnhubSignals =
+    fhTarget !== null ||
+    (Array.isArray(fhInsiders) && fhInsiders.length > 0) ||
+    (Array.isArray(fhEarnings) && fhEarnings.length > 0) ||
+    (Array.isArray(fhRecs) && fhRecs.length > 0) ||
+    Object.values(extras).some((v) => v !== undefined);
 
   const { data: portfolios } = await supabase
     .from("portfolios")
@@ -131,6 +200,23 @@ export default async function AtivoPage({
               subtitle={`Indicadores de ${summary.longName ?? quote.name}`}
             >
               <AssetSummaryPanel summary={summary} />
+            </SectionCard>
+          )}
+
+          {hasFinnhubSignals && (
+            <SectionCard
+              title="Sinais de mercado"
+              subtitle="Preço-alvo, transações de insiders e earnings via Finnhub"
+            >
+              <FinnhubSignalsPanel
+                currency={quote.currency}
+                currentPrice={quote.price}
+                priceTarget={fhTarget}
+                insiders={fhInsiders}
+                earnings={fhEarnings}
+                recommendations={fhRecs}
+                extras={extras}
+              />
             </SectionCard>
           )}
 
