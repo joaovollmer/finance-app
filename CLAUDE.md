@@ -270,6 +270,14 @@ analistas e peers setoriais. InfoTooltip redesenhado para a11y/posicionamento.
   `getAssetFundamentals` e `getPeerQuotes` no `Promise.all` existente.
   Painéis só renderizam quando há dados; empty states amigáveis quando
   Yahoo não publica os demonstrativos (comum para empresas BR).
+- **Modal didático de recomendações** (`components/ui/Modal.tsx` +
+  `RatingsHelpModal` em `FundamentalsPanel`): clicar no card da barra
+  Strong Buy → Strong Sell abre overlay com `backdrop-blur` explicando
+  como as classificações são formadas (quem produz, o que cada uma
+  significa, sobre o que analistas olham, como interpretar consenso,
+  por que não seguir cegamente, fonte + disclaimer). Componente Modal
+  genérico reutilizável: trava scroll do body, dispensa em Esc/clique
+  fora, `aria-modal`.
 - **Testes:** `__tests__/market/fundamentals.test.ts` (10 testes:
   `deriveMultiples` 6 + `resolvePeers` 4). Build verde, 44 testes no
   total.
