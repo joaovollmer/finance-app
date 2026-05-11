@@ -31,6 +31,7 @@ export const GLOSSARY = {
     "Inflação oficial do Brasil (IBGE). Usado em títulos atrelados à inflação como Tesouro IPCA+ e debêntures incentivadas.",
   treasuryYield:
     "Rendimento anual de um título do Tesouro dos EUA até o vencimento. Referência mundial de juros sem risco em dólar.",
+  // Fundamentos (Sprint B) ----------------------------------------------
   totalRevenue:
     "Receita bruta total no ano. Soma de tudo que a empresa faturou antes de descontar custos, despesas e impostos.",
   grossProfit:
@@ -64,9 +65,28 @@ export const GLOSSARY = {
   netDebtToEbitda:
     "Dívida líquida / EBITDA. Mede capacidade de pagamento: 1x baixo, 3x+ exige atenção, 5x+ alavancagem alta.",
   payoutRatio:
-    "Porcentagem do lucro distribuído como dividendos. Alto = mais renda hoje; baixo = mais reinvestimento.",
+    "Porcentagem do lucro distribuída como dividendos. Alto = mais renda hoje, baixo = mais reinvestimento na empresa.",
   grossMargin:
-    "Lucro bruto sobre receita. Mostra quanto sobra depois do custo direto do produto.",
+    "Lucro bruto sobre receita. Mostra quanto sobra depois do custo direto do produto/serviço.",
   operatingMargin:
     "Lucro operacional sobre receita. Eficiência depois de pagar todos os custos operacionais (sem juros e impostos).",
+  // Sinais Finnhub (Sprint D) -------------------------------------------
+  priceTarget:
+    "Preço-alvo: valor que analistas projetam para o ativo nos próximos 12 meses. A diferença entre o alvo e a cotação atual é o 'upside' potencial.",
+  roa:
+    "Return on Assets: lucro líquido dividido pelo ativo total. Mede eficiência de uso dos ativos da empresa.",
+  debtToEquity:
+    "Dívida total dividida pelo patrimônio líquido. Acima de 100% indica alavancagem agressiva.",
+  currentRatio:
+    "Liquidez corrente: ativo circulante / passivo circulante. Acima de 1 indica capacidade de honrar dívidas de curto prazo.",
+  revenueGrowthYoy:
+    "Crescimento da receita nos últimos 12 meses vs. os 12 meses anteriores (YoY = year over year).",
+  pegRatio:
+    "P/L ajustado pelo crescimento esperado dos lucros (PEG = P/E ÷ growth). PEG abaixo de 1 sugere ativo barato em relação ao crescimento.",
+  relativeToSP500:
+    "Performance do ativo nas últimas 26 semanas em relação ao S&P 500. Positivo = bateu o índice; negativo = ficou para trás.",
+  earningsSurprise:
+    "Diferença entre o lucro por ação reportado e a estimativa média dos analistas para o trimestre. Surpresa positiva = empresa superou expectativa.",
+  insiderTransactions:
+    "Compras e vendas de ações feitas por executivos e diretores da empresa, reportadas à SEC. Insider comprando = sinal positivo (acreditam na empresa); vendendo = pode ser realização de lucro ou sinal de alerta.",
 } as const;

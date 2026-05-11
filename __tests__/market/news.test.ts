@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseGoogleNewsRss } from "@/lib/market/news";
+import {
+  canonicalUrl,
+  dedupeNews,
+  parseGoogleNewsRss,
+} from "@/lib/market/news";
+import type { NewsItem } from "@/lib/market/news";
 
 describe("parseGoogleNewsRss", () => {
   const sample = `<?xml version="1.0" encoding="UTF-8"?>
@@ -67,5 +72,61 @@ describe("parseGoogleNewsRss", () => {
     const items = parseGoogleNewsRss(broken, 10);
     expect(items).toHaveLength(1);
     expect(items[0].title).toBe("OK");
+  });
+});
+
+describe("canonicalUrl", () => {
+  it("remove query string e fragmento", () => {
+    expect(canonicalUrl("https://x.com/path?utm=foo#frag")).toBe(
+      "https://x.com/path"
+    );
+  });
+
+  it("normaliza para lowercase e tira trailing slash", () => {
+    expect(canonicalUrl("https://X.COM/Path/")).toBe("https://x.com/path");
+  });
+
+  it("URL inválida volta como lowercase do input", () => {
+    expect(canonicalUrl("nao-eh-url")).toBe("nao-eh-url");
+  });
+});
+
+describe("dedupeNews", () => {
+  const base: Omit<NewsItem, "title" | "link"> = {
+    publisher: "Test",
+    publishedAt: "2026-05-10T00:00:00.000Z",
+    source: "yahoo",
+  };
+
+  it("dedupa por URL canonicalizada (ignora query)", () => {
+    const items: NewsItem[] = [
+      { ...base, title: "A", link: "https://x.com/a?utm=1" },
+      { ...base, title: "B", link: "https://x.com/a?utm=2", source: "finnhub" },
+      { ...base, title: "C", link: "https://x.com/c" },
+    ];
+    const out = dedupeNews(items);
+    expect(out).toHaveLength(2);
+    expect(out[0].title).toBe("A"); // primeiro vence
+    expect(out[1].title).toBe("C");
+  });
+
+  it("dedupa por título normalizado", () => {
+    const items: NewsItem[] = [
+      { ...base, title: "Petrobras anuncia dividendos!", link: "https://a.com/1" },
+      { ...base, title: "PETROBRAS anuncia dividendos", link: "https://b.com/1" },
+      { ...base, title: "Outra coisa", link: "https://c.com/1" },
+    ];
+    const out = dedupeNews(items);
+    expect(out).toHaveLength(2);
+    expect(out[0].title).toBe("Petrobras anuncia dividendos!");
+  });
+
+  it("preserva múltiplas notícias distintas", () => {
+    const items: NewsItem[] = [
+      { ...base, title: "A", link: "https://x.com/a" },
+      { ...base, title: "B", link: "https://x.com/b" },
+      { ...base, title: "C", link: "https://x.com/c" },
+    ];
+    expect(dedupeNews(items)).toHaveLength(3);
   });
 });

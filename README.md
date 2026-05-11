@@ -31,8 +31,15 @@ A linguagem é acessível ao leigo, mas os dados têm profundidade para o avanç
   via BCB SGS + Treasury Fiscal Data.
 - **Dashboard `/carteira`** com patrimônio total, P&L, posições de RV e RF,
   gráfico de evolução com snapshot diário.
-- **Notícias por ativo** (v1.2 — Sprint C): manchetes recentes via Yahoo
-  Finance com fallback para Google News RSS, exibidas no detalhe do ativo.
+- **Notícias por ativo** (v1.2 — Sprint C): manchetes ticker-aware
+  agregadas de múltiplos providers (Yahoo + Finnhub opcional + Google
+  News RSS), com dedupe por URL canônica e título normalizado.
+- **Integração Finnhub** (v1.2 — Sprint D): além das notícias,
+  consumimos endpoints free do Finnhub para preço-alvo dos analistas,
+  métricas financeiras complementares (ROA, payout, dívida/patrimônio,
+  PEG, etc.), surpresas de earnings e transações de insiders. Cobertura
+  US/internacional; para B3 os adapters retornam null silenciosamente e
+  o app cai 100% no Yahoo. Tudo gated por `FINNHUB_API_KEY` opcional.
 - **Onboarding flexível** (v1.2 — Sprint A): saldo inicial deixou de ser
   obrigatório. No modo deposit-on-buy a carteira começa zerada e cada
   compra incrementa o `total_deposited`; o dashboard mostra "Total
@@ -67,12 +74,13 @@ app/
     ativo/[ticker]/                 # detalhe + gráfico + OrderForm
   api/{quote,history,search,fx,news}/ # endpoints sobre os providers
 lib/
-  market/{yahoo,bcb,rates,news,peers,types}.ts
+  market/{yahoo,finnhub,aggregate,bcb,rates,peers,types}.ts
+  market/news/{index,types,rss}.ts + providers/{yahoo,finnhub,google_rss}.ts
   portfolio/{valuation,fixed_income}.ts
 components/
   auth/{AuthShell,LogoutButton}.tsx
   charts/PortfolioChart.tsx
-  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,FundamentalsPanel,PeersPanel,NewsPanel}.tsx
+  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,FundamentalsPanel,PeersPanel,FinnhubSignalsPanel,NewsPanel}.tsx
   ui/{Card,InfoTooltip,LogoMark,NavLink}.tsx
 supabase/migrations/
   0001_init.sql                     # schema + RLS + RPC execute_order
@@ -309,9 +317,22 @@ Dividida em sprints, cada uma virando uma branch
   - Múltiplos históricos (P/L, P/VP, EV/EBITDA), payout, dívida líquida/EBITDA.
   - Histórico de dividendos, splits e recomendações de analistas.
   - Comparação setorial (peers).
-- Notícias do ativo ✅ (Sprint C): agregação de manchetes via
-  `yahoo-finance2.search().news` com fallback para RSS do Google News,
-  exibidas como cards com hyperlink em `/ativo/[ticker]`.
+- Notícias do ativo ✅ (Sprint C): refator em providers plugáveis
+  (`lib/market/news/`). Suporte a Yahoo + Finnhub + Google News RSS.
+  Dedupe por URL canônica + título normalizado. Cada provider declara
+  `enabled()` e é pulado silenciosamente quando a config falta.
+- Integração Finnhub multi-fonte ✅ (Sprint D — expandida):
+  - `lib/market/finnhub.ts` com 7 adapters tipados (quote, profile,
+    metric, recommendation, price-target, insider, earnings) gated por
+    `FINNHUB_API_KEY` e cache 30min.
+  - `lib/market/aggregate.ts` faz merge Yahoo+Finnhub para Quote e
+    AssetSummary — Yahoo é fonte primária, Finnhub preenche lacunas.
+  - `FinnhubSignalsPanel` mostra preço-alvo dos analistas (com upside
+    %), surpresas de earnings, transações de insiders e indicadores
+    complementares (ROA, dívida/PL, PEG, liquidez corrente,
+    crescimento YoY, performance vs S&P).
+  - Cobertura limitada para B3 — adapters retornam null para tickers
+    `.SA` e o painel é ocultado.
 
 ### Fase 1.3 — Renda fixa e fundos via fontes brasileiras (semanas 4–8)
 
