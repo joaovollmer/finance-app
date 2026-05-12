@@ -371,9 +371,29 @@ e cada compra incrementa o aporte.
 ## v1.2 — Sprint D (integração Finnhub multi-fonte) — maio/2026
 
 Branch: `claude/v1.2-news-providers-sprint-d` (nome legado — escopo
-expandido depois da fase 1). Renomeado conceitualmente para
+expandido em 3 fases). Renomeado conceitualmente para
 **"Integração Finnhub"**: além de notícias, consome todos os endpoints
-free do Finnhub e faz merge com Yahoo para dados financeiros.
+free do Finnhub, faz merge com Yahoo para dados financeiros e
+consolida 3 painéis em 1 único com atribuição de fonte por métrica.
+
+### Hotfix do cron snapshot (fase 0)
+
+- Bug reportado via Sentry: `SyntaxError: Unexpected token '<',
+  "<?xml vers"... is not valid JSON` em `GET /api/cron/snapshot`.
+  Causa: BCB SGS ocasionalmente responde com página de manutenção
+  XML/HTML mesmo com HTTP 200, e o `await res.json()` quebrava com
+  SyntaxError que abortava o snapshot inteiro.
+- Fix em 2 partes:
+  1. **`lib/market/http.ts`** novo, com `parseJsonResponse<T>(res, ctx)`
+     — lê body como texto, valida o prefixo (rejeita se começa com `<`)
+     e só então faz `JSON.parse`. Erro fica legível ("retornou XML/HTML
+     em vez de JSON") em vez de SyntaxError. Aplicado em `bcb.ts`,
+     `rates.ts` (BCB + Treasury) e `finnhub.ts`.
+  2. **Cron** agora chama `Sentry.captureException` no catch por
+     portfolio e segue para o próximo — uma falha de fonte não aborta
+     o snapshot diário inteiro.
+- Teste de regressão em `__tests__/market/bcb.test.ts` mockando fetch
+  que devolve `<?xml...>`.
 
 ### Fase 1: pluralização de providers de notícias
 
@@ -467,6 +487,48 @@ Finnhub para todas as fontes de dado disponíveis no free tier.
   `mapMetrics`, `mergeQuote`, `mergeSummary`, `extractFinnhubExtras`).
   Total: 52 testes verdes.
 - **Sem migration.** Sem mudança de schema.
+
+### Fase 3: unificação dos painéis (refactor pedido pelo usuário)
+
+Após teste de usuário, os 3 painéis separados (AssetSummary +
+Fundamentals Yahoo + Sinais Finnhub) ficaram confusos — usuário não
+sabia de onde vinha cada dado e via informações duplicadas. Refactor:
+
+- **`lib/market/unified.ts`** novo, com `buildUnifiedFundamentals` que
+  produz uma única estrutura `UnifiedFundamentals` mesclando Yahoo +
+  Finnhub. Cada métrica vira `{ value, source, formula? }` — source ∈
+  `yahoo` | `finnhub` | `calculated`. Lógica de fallback em 3 níveis:
+  1. Yahoo preferido quando existe.
+  2. Finnhub preenche lacunas.
+  3. Cálculo manual a partir dos demonstrativos quando nem Yahoo nem
+     Finnhub publicam (margem bruta = grossProfit/totalRevenue,
+     EV/EBITDA = (mcap+debt-cash)/EBITDA, ROE = net/equity, debt/equity
+     calculado, revenue growth YoY, etc.). Cada cálculo carrega a
+     fórmula no metadata para o tooltip mostrar.
+- **`mergeRecommendations`**: consolida Yahoo `recommendationTrend` +
+  Finnhub `recommendation` numa única barra. Soma contagens quando
+  ambas as fontes têm dados (marcando `source: merged`). Yahoo's
+  `upgradeDowngradeHistory` ganha coluna "Notícias" com link para
+  `news.google.com/search?q=<casa>+<ticker>` (`newsSearchUrl`) — abre
+  a busca de imprensa pela casa para contextualizar o movimento.
+- **`UnifiedFundamentalsPanel`**: substitui AssetSummaryPanel +
+  FundamentalsPanel + FinnhubSignalsPanel num só componente. Layout:
+  header stats (8 cards) → indicadores complementares (12 cards com
+  margens, ROE, ROA, D/E, etc.) → preço-alvo Finnhub → tabs
+  (Resultado / Balanço / Caixa / Múltiplos / Recomendações / Earnings).
+  Cada card tem um `SourceBadge` (Y / F / f(x)) e o InfoTooltip
+  estendido inclui a linha "Fonte: …" abaixo da definição do glossário.
+- **Insiders removidos**: a tabela de transações de insiders foi
+  cortada — nos testes não agregava valor educacional e poluía a UI.
+  `getFinnhubInsiderTransactions` e o tipo `FinnhubInsiderRecord`
+  foram removidos do `lib/market/finnhub.ts`.
+- **Páginas e arquivos removidos**: `AssetSummaryPanel.tsx`,
+  `FundamentalsPanel.tsx`, `FinnhubSignalsPanel.tsx` deletados.
+- **Testes**: `__tests__/market/unified.test.ts` com 11 testes
+  cobrindo fallbacks (Yahoo → Finnhub → calculado), `mergeRecommendations`
+  nas 4 combinações (vazio / só Yahoo / só Finnhub / merged) e
+  `newsSearchUrl`. Total: 74 testes verdes.
+- **Sem migration.**
 
 ## v1.2 — Sprint C (notícias por ativo) — maio/2026
 

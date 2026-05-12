@@ -1,6 +1,8 @@
 // Câmbio do Banco Central do Brasil (SGS).
 // Série 1 = dólar comercial (venda) PTAX. Resposta JSON: [{ data: 'dd/mm/yyyy', valor: '5.0123' }, ...]
 
+import { parseJsonResponse } from "./http";
+
 const SGS_LAST_USD = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.1/dados/ultimos/1?formato=json";
 
 // O BCB não publica PTAX em fins de semana/feriados, então a última cotação publicada
@@ -25,7 +27,10 @@ export async function getUsdToBrl(): Promise<FxRate> {
   if (!res.ok) {
     throw new Error(`BCB respondeu ${res.status}`);
   }
-  const json = (await res.json()) as { data: string; valor: string }[];
+  const json = await parseJsonResponse<{ data: string; valor: string }[]>(
+    res,
+    "BCB SGS-1"
+  );
   const last = json[json.length - 1];
   if (!last) throw new Error("BCB sem dados");
 

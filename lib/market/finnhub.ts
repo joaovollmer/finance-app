@@ -10,6 +10,7 @@
 // Docs base: https://finnhub.io/docs/api
 
 import * as Sentry from "@sentry/nextjs";
+import { parseJsonResponse } from "./http";
 
 const BASE = "https://finnhub.io/api/v1";
 const TTL_MS = 30 * 60 * 1000;
@@ -58,7 +59,7 @@ async function fhFetch<T>(
       next: { revalidate: 1800 },
     });
     if (!res.ok) throw new Error(`Finnhub ${path} respondeu ${res.status}`);
-    const data = (await res.json()) as T;
+    const data = await parseJsonResponse<T>(res, `Finnhub ${path}`);
     cache.set(cacheKey, { value: data, fetchedAt: now });
     return data;
   } catch (error) {
@@ -297,50 +298,6 @@ export async function getFinnhubPriceTarget(
   // cobertura. Filtramos esses.
   if (!data || !data.targetMean || data.targetMean <= 0) return null;
   return data;
-}
-
-// --- Insider Transactions ----------------------------------------------
-
-export interface FinnhubInsiderRaw {
-  name?: string;
-  share?: number;
-  change?: number;
-  filingDate?: string;
-  transactionDate?: string;
-  transactionCode?: string;
-  transactionPrice?: number;
-}
-
-export interface FinnhubInsiderRecord {
-  insider: string;
-  date: string;
-  change: number;
-  price: number;
-  transactionCode: string;
-}
-
-export async function getFinnhubInsiderTransactions(
-  ticker: string,
-  limit = 12
-): Promise<FinnhubInsiderRecord[]> {
-  const symbol = finnhubSymbol(ticker);
-  if (!symbol) return [];
-  const data = await fhFetch<{ data?: FinnhubInsiderRaw[] }>(
-    "/stock/insider-transactions",
-    { symbol },
-    `insider:${symbol}`
-  );
-  const raw = data?.data ?? [];
-  return raw
-    .filter((r) => r.name && r.transactionDate && typeof r.change === "number")
-    .slice(0, limit)
-    .map<FinnhubInsiderRecord>((r) => ({
-      insider: r.name!,
-      date: r.transactionDate!,
-      change: r.change!,
-      price: r.transactionPrice ?? 0,
-      transactionCode: r.transactionCode ?? "—",
-    }));
 }
 
 // --- Earnings Surprises -------------------------------------------------

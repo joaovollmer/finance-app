@@ -30,14 +30,15 @@ describe("BCB getUsdToBrl (fetch mockado)", () => {
   });
 
   it("parseia o último valor da série SGS-1", async () => {
+    const payload = JSON.stringify([
+      { data: "06/05/2026", valor: "5.0123" },
+      { data: "07/05/2026", valor: "5.1234" },
+    ]);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         ok: true,
-        json: async () => [
-          { data: "06/05/2026", valor: "5.0123" },
-          { data: "07/05/2026", valor: "5.1234" },
-        ],
+        text: async () => payload,
       })) as unknown as typeof fetch
     );
 
@@ -58,5 +59,19 @@ describe("BCB getUsdToBrl (fetch mockado)", () => {
 
     const { getUsdToBrl } = await import("@/lib/market/bcb");
     await expect(getUsdToBrl()).rejects.toThrow(/503/);
+  });
+
+  it("levanta erro legível quando BCB retorna XML em vez de JSON (regressão do bug do cron)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        text: async () =>
+          '<?xml version="1.0" encoding="UTF-8"?><html>maintenance</html>',
+      })) as unknown as typeof fetch
+    );
+
+    const { getUsdToBrl } = await import("@/lib/market/bcb");
+    await expect(getUsdToBrl()).rejects.toThrow(/XML\/HTML/);
   });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { computePortfolioValue } from "@/lib/portfolio/total_value";
 import type { PortfolioRow } from "@/lib/portfolio/valuation";
@@ -59,6 +60,13 @@ export async function GET(req: Request) {
         results.push({ portfolio_id: p.id, total: totalValue });
       }
     } catch (err) {
+      // Logamos no Sentry mas seguimos para o próximo portfolio — uma
+      // falha de fonte (BCB/Treasury/Yahoo devolvendo XML/HTML, p.ex.)
+      // não deve abortar o snapshot diário inteiro.
+      Sentry.captureException(err, {
+        tags: { area: "cron_snapshot" },
+        extra: { portfolio_id: p.id },
+      });
       results.push({
         portfolio_id: p.id,
         total: null,
