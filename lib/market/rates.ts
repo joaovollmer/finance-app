@@ -11,6 +11,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import yfDefault from "yahoo-finance2";
+import { parseJsonResponse } from "./http";
 
 export interface FixedIncomeRate {
   code: string;
@@ -68,7 +69,10 @@ async function fetchBcbSeries(seriesId: number, last = 1) {
   const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.${seriesId}/dados/ultimos/${last}?formato=json`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`BCB ${seriesId} respondeu ${res.status}`);
-  return (await res.json()) as { data: string; valor: string }[];
+  return parseJsonResponse<{ data: string; valor: string }[]>(
+    res,
+    `BCB SGS-${seriesId}`
+  );
 }
 
 async function getBcbRate(code: keyof typeof BCB_SERIES): Promise<FixedIncomeRate> {
@@ -199,7 +203,10 @@ async function fetchTreasuryLatest(): Promise<TreasuryRow | null> {
         `Treasury respondeu ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`
       );
     }
-    const json = (await res.json()) as { data?: TreasuryRow[] };
+    const json = await parseJsonResponse<{ data?: TreasuryRow[] }>(
+      res,
+      "US Treasury Fiscal Data"
+    );
     const row = json.data?.[0] ?? null;
     if (row) cache.set("treasury:latest", { value: row, fetchedAt: Date.now() });
     return row;

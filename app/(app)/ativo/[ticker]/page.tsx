@@ -12,27 +12,21 @@ import { resolvePeers } from "@/lib/market/peers";
 import {
   finnhubEnabled,
   getFinnhubEarnings,
-  getFinnhubInsiderTransactions,
   getFinnhubMetrics,
   getFinnhubPriceTarget,
   getFinnhubProfile,
   getFinnhubQuote,
   getFinnhubRecommendations,
 } from "@/lib/market/finnhub";
-import {
-  extractFinnhubExtras,
-  mergeQuote,
-  mergeSummary,
-} from "@/lib/market/aggregate";
+import { mergeQuote } from "@/lib/market/aggregate";
+import { buildUnifiedFundamentals } from "@/lib/market/unified";
 import { getUsdToBrl } from "@/lib/market/bcb";
 import { getAssetNews } from "@/lib/market/news";
 import { formatCurrency } from "@/lib/portfolio/valuation";
 import PriceChart from "@/components/market/PriceChart";
 import OrderForm from "@/components/market/OrderForm";
-import AssetSummaryPanel from "@/components/market/AssetSummaryPanel";
-import FundamentalsPanel from "@/components/market/FundamentalsPanel";
+import UnifiedFundamentalsPanel from "@/components/market/UnifiedFundamentalsPanel";
 import PeersPanel from "@/components/market/PeersPanel";
-import FinnhubSignalsPanel from "@/components/market/FinnhubSignalsPanel";
 import NewsPanel from "@/components/market/NewsPanel";
 import { SectionCard, Badge } from "@/components/ui/Card";
 
@@ -70,64 +64,54 @@ export default async function AtivoPage({
     notFound();
   }
 
-  // Finnhub: roda em paralelo só quando há chave configurada. Para B3 cada
-  // adapter já retorna null silenciosamente — manter o gate aqui evita 7
-  // requests sem sentido.
+  // Finnhub: roda em paralelo quando há chave. Tickers .SA cortam dentro
+  // de cada adapter, então deixamos o gate só evitar 6 fetches em vão.
+  // Insiders foram removidos (Sprint v1.2-D fase 3): não traziam valor
+  // educacional nos testes de usuário.
   const enabled = finnhubEnabled();
-  const [
-    fhQuote,
-    fhProfile,
-    fhMetrics,
-    fhTarget,
-    fhRecs,
-    fhInsiders,
-    fhEarnings,
-  ] = await Promise.all([
-    enabled ? getFinnhubQuote(decoded).catch(() => null) : Promise.resolve(null),
-    enabled ? getFinnhubProfile(decoded).catch(() => null) : Promise.resolve(null),
-    enabled ? getFinnhubMetrics(decoded).catch(() => null) : Promise.resolve(null),
-    enabled ? getFinnhubPriceTarget(decoded).catch(() => null) : Promise.resolve(null),
-    enabled
-      ? getFinnhubRecommendations(decoded).catch(
-          () => [] as Awaited<ReturnType<typeof getFinnhubRecommendations>>
-        )
-      : Promise.resolve(
-          [] as Awaited<ReturnType<typeof getFinnhubRecommendations>>
-        ),
-    enabled
-      ? getFinnhubInsiderTransactions(decoded).catch(
-          () => [] as Awaited<ReturnType<typeof getFinnhubInsiderTransactions>>
-        )
-      : Promise.resolve(
-          [] as Awaited<ReturnType<typeof getFinnhubInsiderTransactions>>
-        ),
-    enabled
-      ? getFinnhubEarnings(decoded).catch(
-          () => [] as Awaited<ReturnType<typeof getFinnhubEarnings>>
-        )
-      : Promise.resolve([] as Awaited<ReturnType<typeof getFinnhubEarnings>>),
-  ]);
+  const [fhQuote, fhProfile, fhMetrics, fhTarget, fhRecs, fhEarnings] =
+    await Promise.all([
+      enabled ? getFinnhubQuote(decoded).catch(() => null) : Promise.resolve(null),
+      enabled ? getFinnhubProfile(decoded).catch(() => null) : Promise.resolve(null),
+      enabled ? getFinnhubMetrics(decoded).catch(() => null) : Promise.resolve(null),
+      enabled ? getFinnhubPriceTarget(decoded).catch(() => null) : Promise.resolve(null),
+      enabled
+        ? getFinnhubRecommendations(decoded).catch(
+            () => [] as Awaited<ReturnType<typeof getFinnhubRecommendations>>
+          )
+        : Promise.resolve(
+            [] as Awaited<ReturnType<typeof getFinnhubRecommendations>>
+          ),
+      enabled
+        ? getFinnhubEarnings(decoded).catch(
+            () => [] as Awaited<ReturnType<typeof getFinnhubEarnings>>
+          )
+        : Promise.resolve([] as Awaited<ReturnType<typeof getFinnhubEarnings>>),
+    ]);
 
   const quote = mergeQuote(quoteRaw, fhQuote);
-  const summary = summaryRaw
-    ? mergeSummary(summaryRaw, fhMetrics, fhProfile)
-    : null;
-  const extras = extractFinnhubExtras(fhMetrics);
 
-  const hasFinnhubSignals =
-    fhTarget !== null ||
-    fhInsiders.length > 0 ||
-    fhEarnings.length > 0 ||
-    fhRecs.length > 0 ||
-    Object.values(extras).some((v) => v !== undefined);
+  // Constrói a estrutura unificada Yahoo + Finnhub + cálculos derivados.
+  const unified = buildUnifiedFundamentals({
+    ticker: quote.ticker,
+    displayTicker: quote.displayTicker,
+    currency: quote.currency,
+    summary: summaryRaw,
+    fundamentals,
+    metrics: fhMetrics,
+    profile: fhProfile,
+    finnhubRecommendations: fhRecs,
+    priceTarget: fhTarget,
+    earnings: fhEarnings,
+  });
 
   // Peers via lista curada por setor/indústria (heurística — não bloqueia
   // se vier vazia).
-  const peerSymbols = summary
+  const peerSymbols = unified.sector || unified.industry
     ? resolvePeers({
         ticker: quote.ticker,
-        sector: summary.sector,
-        industry: summary.industry,
+        sector: unified.sector?.value,
+        industry: unified.industry?.value,
         isB3: quote.assetClass === "stock_br",
       })
     : [];
@@ -219,52 +203,17 @@ export default async function AtivoPage({
             />
           </SectionCard>
 
-          {summary && (
-            <SectionCard
-              title="Fundamentos"
-              subtitle={`Indicadores de ${summary.longName ?? quote.name}`}
-            >
-              <AssetSummaryPanel summary={summary} />
-            </SectionCard>
-          )}
-
-          {fundamentals &&
-            (fundamentals.income.length > 0 ||
-              fundamentals.balance.length > 0 ||
-              fundamentals.cashflow.length > 0 ||
-              fundamentals.recommendations.length > 0) && (
-              <SectionCard
-                title="Demonstrativos e múltiplos"
-                subtitle="Resultado, balanço, fluxo de caixa, múltiplos derivados e recomendações"
-              >
-                <FundamentalsPanel
-                  fundamentals={fundamentals}
-                  currency={quote.currency}
-                />
-              </SectionCard>
-            )}
-
-          {hasFinnhubSignals && (
-            <SectionCard
-              title="Sinais de mercado"
-              subtitle="Preço-alvo, transações de insiders e earnings via Finnhub"
-            >
-              <FinnhubSignalsPanel
-                currency={quote.currency}
-                currentPrice={quote.price}
-                priceTarget={fhTarget}
-                insiders={fhInsiders}
-                earnings={fhEarnings}
-                recommendations={fhRecs}
-                extras={extras}
-              />
-            </SectionCard>
-          )}
+          <SectionCard
+            title="Fundamentos"
+            subtitle="Yahoo Finance + Finnhub · indicadores, demonstrativos e recomendações"
+          >
+            <UnifiedFundamentalsPanel data={unified} />
+          </SectionCard>
 
           {peers.length > 0 && (
             <SectionCard
               title="Comparação setorial"
-              subtitle={`Peers em ${summary?.industry ?? summary?.sector ?? "mesmo setor"}`}
+              subtitle={`Peers em ${unified.industry?.value ?? unified.sector?.value ?? "mesmo setor"}`}
             >
               <PeersPanel peers={peers} />
             </SectionCard>

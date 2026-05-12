@@ -35,11 +35,16 @@ A linguagem é acessível ao leigo, mas os dados têm profundidade para o avanç
   agregadas de múltiplos providers (Yahoo + Finnhub opcional + Google
   News RSS), com dedupe por URL canônica e título normalizado.
 - **Integração Finnhub** (v1.2 — Sprint D): além das notícias,
-  consumimos endpoints free do Finnhub para preço-alvo dos analistas,
-  métricas financeiras complementares (ROA, payout, dívida/patrimônio,
-  PEG, etc.), surpresas de earnings e transações de insiders. Cobertura
-  US/internacional; para B3 os adapters retornam null silenciosamente e
-  o app cai 100% no Yahoo. Tudo gated por `FINNHUB_API_KEY` opcional.
+  consumimos endpoints free do Finnhub e fazemos merge com Yahoo num
+  painel **único de fundamentos** — preço-alvo dos analistas, métricas
+  financeiras complementares (ROA, payout, dívida/patrimônio, PEG, etc.),
+  surpresas de earnings e recomendações consolidadas. Cada métrica
+  carrega a fonte (Yahoo, Finnhub ou cálculo derivado) e fórmula via
+  tooltip. Quando nem Yahoo nem Finnhub publicam um indicador, o app
+  tenta calcular a partir dos demonstrativos (margem bruta =
+  lucro bruto ÷ receita, EV/EBITDA, ROE, etc.). Para B3 os adapters
+  Finnhub retornam null silenciosamente e o app cai 100% no Yahoo.
+  Tudo gated por `FINNHUB_API_KEY` opcional.
 - **Onboarding flexível** (v1.2 — Sprint A): saldo inicial deixou de ser
   obrigatório. No modo deposit-on-buy a carteira começa zerada e cada
   compra incrementa o `total_deposited`; o dashboard mostra "Total
@@ -74,13 +79,13 @@ app/
     ativo/[ticker]/                 # detalhe + gráfico + OrderForm
   api/{quote,history,search,fx,news}/ # endpoints sobre os providers
 lib/
-  market/{yahoo,finnhub,aggregate,bcb,rates,peers,types}.ts
+  market/{yahoo,finnhub,aggregate,unified,bcb,rates,peers,http,types}.ts
   market/news/{index,types,rss}.ts + providers/{yahoo,finnhub,google_rss}.ts
   portfolio/{valuation,fixed_income}.ts
 components/
   auth/{AuthShell,LogoutButton}.tsx
   charts/PortfolioChart.tsx
-  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,AssetSummaryPanel,FundamentalsPanel,PeersPanel,FinnhubSignalsPanel,NewsPanel}.tsx
+  market/{AssetSearch,PriceChart,OrderForm,BondOrderForm,UnifiedFundamentalsPanel,PeersPanel,NewsPanel}.tsx
   ui/{Card,InfoTooltip,LogoMark,NavLink}.tsx
 supabase/migrations/
   0001_init.sql                     # schema + RLS + RPC execute_order
